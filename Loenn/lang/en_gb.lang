@@ -1,0 +1,7 @@
+entities.ZoomOutHelperPrototype/GlobalZoomController.placements.name.globalZoomController=Global Zoom Controller
+triggers.ZoomOutHelperPrototype/CameraScaleFadeTrigger.placements.name.cameraScaleFade=Camera Scale Fade
+triggers.ZoomOutHelperPrototype/CameraScaleFadeTrigger.placements.name.zoomOutFade=Zoom Out Fade
+triggers.ZoomOutHelperPrototype/SpawnCameraScaleTrigger.placements.name.spawnCameraScaleTrigger=Spawn Camera Scale
+triggers.ZoomOutHelperPrototype/SpawnCameraScaleTrigger.placements.name.spawnZoomTrigger=Spawn Zoom Out
+
+mods.ZoomOutHelperPrototype.name=Zoom Out Helper (Prototype)
