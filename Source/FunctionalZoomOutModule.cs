@@ -133,6 +133,8 @@ public class FunctionalZoomOutModule : EverestModule {
     internal static bool MainHooksLoaded { get; private set; }
 
     private static void UpdateMainHooks(bool loadHooks) {
+        LevelContainsZoomOut = loadHooks;
+
         if (MainHooksLoaded == loadHooks) {
             Logger.Info("ZoomOutHelperPrototype", $"already in correct hook state ({(MainHooksLoaded ? "loaded" : "unloaded")}).");
             return;
@@ -152,13 +154,10 @@ public class FunctionalZoomOutModule : EverestModule {
             HookHelper.LoadTag("mainZoomHooks");
             HookHelper.LoadTag("modHooks");
         }
-
-        LevelContainsZoomOut = MainHooksLoaded;
     }
 
     private static bool SessionHasZoomOut(Session session, out float initialScale, out int version) {
         var zoomOutEntities = session.MapData.Levels.SelectMany(levelData => levelData.Entities).Where(entityData => entityData.Name.StartsWith("ZoomOutHelperPrototype"));
-
         var globalController = zoomOutEntities.FirstOrDefault(entityData => entityData.Name.EndsWith("GlobalZoomController"));
         if (globalController is not null) {
             initialScale = globalController.Float("initialCameraScale", 1f);
