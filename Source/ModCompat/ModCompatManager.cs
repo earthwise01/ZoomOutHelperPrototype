@@ -17,7 +17,8 @@ public static class ModCompatManager {
 
     [HookLoadCallback("modHooks")]
     public static void Load() {
-        if (FrostHelperCompat.Module is not null) {
+        // dont load frosthelper hooks for newer versions
+        if (FrostHelperCompat.Module is not null && FrostHelperCompat.Module.Metadata.Version < new Version(1, 56, 0)) {
             FrostHelperCompat.InitReflection();
             FrostHelperCompat.Load();
             Logger.Info("ZoomOutHelperPrototype", "loaded cross helper hooks for frost helper!");

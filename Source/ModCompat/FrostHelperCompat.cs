@@ -16,6 +16,7 @@ using Celeste.Mod.FunctionalZoomOut.Utils;
 
 namespace Celeste.Mod.FunctionalZoomOut.ModCompat;
 
+// only loaded for old frosthelper versions since modern frosthelper has support for resized gameplay buffers built in !
 public class FrostHelperCompat : ModCompatBase {
     public override string Name => "FrostHelper";
 
