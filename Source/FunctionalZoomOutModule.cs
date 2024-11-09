@@ -136,7 +136,7 @@ public class FunctionalZoomOutModule : EverestModule {
         LevelContainsZoomOut = loadHooks;
 
         if (MainHooksLoaded == loadHooks) {
-            Logger.Info("ZoomOutHelperPrototype", $"already in correct hook state ({(MainHooksLoaded ? "loaded" : "unloaded")}).");
+            Logger.Debug("ZoomOutHelperPrototype", $"already in correct hook state ({(MainHooksLoaded ? "loaded" : "unloaded")}).");
             return;
         }
 
@@ -272,12 +272,21 @@ public class FunctionalZoomOutModule : EverestModule {
             // camera can clip oob when chaning zoom scale atm, need to work on that
             // tbf in general i could probably handle this better
             camera.Position = level.GetFullCameraTargetAt(player, player.Position) + cameraOffsetFromTarget;
+            enforceLevelBounds(level, player, camera);
             camera.UpdateMatrices();
         }
 
         data.Set("ZoomOutHelperPrototype_CurrentZoom", levelScale);
+        // i really *really* should make it so that Level.Zoom / Level.ZoomTarget are used or at least set so that mod compat works with excameradynamics better but i am   so fkn exhausted right now bleh
 
         RenderTargetScaleManager.Update();
+
+        static void enforceLevelBounds(Level level, Player player, Camera camera) {
+            if (!level.Transitioning && player.EnforceLevelBounds) {
+                camera.X = MathHelper.Clamp(camera.X, level.Bounds.Left, level.Bounds.Right - 320);
+                camera.Y = MathHelper.Clamp(camera.Y, level.Bounds.Top, level.Bounds.Bottom - 180);
+            }
+        }
     }
 
     [OnHook(typeof(Level), nameof(Level.orig_LoadLevel), BindingFlags.Public | BindingFlags.Instance, tag: "mainZoomHooks")]

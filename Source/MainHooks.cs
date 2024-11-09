@@ -205,11 +205,22 @@ public static class MainHooks {
         cursor.FixCameraDimensionsFloatPadded(2);
     }
 
-    // fades out a bit too much towards the edges when zoomed out, shd try and figure something out for that
     [ILHook(typeof(Audio), nameof(Audio.Position), BindingFlags.Public | BindingFlags.Static, tag: "mainZoomHooks")]
     private static void Audio_Position(ILContext il) {
         ILCursor cursor = new(il);
         cursor.FixCameraDimensionsFloat();
+
+        cursor.GotoNext(MoveType.Before, instr => instr.MatchStfld<FMOD.VECTOR>("z"));
+        cursor.EmitDelegate(stolenAudioEdgeFadeFix);
+
+        // https://github.com/Ikersfletch/ExCameraDynamics/blob/8baf1291f3f81bf99a07df3f8a56c6c42de47534/Code/Hooks/CameraZoomHooks.cs#L377
+        // i really really want to avoid stealing stuff from excameradynamics typically but its probably for the best to have 100% parity for stuff like this
+        static float stolenAudioEdgeFadeFix(float orig) {
+            if (!FunctionalZoomOutModule.ZoomOutActive)
+                return orig;
+
+            return -MathF.Log(1f / FunctionalZoomOutModule.CameraScale);
+        }
     }
 
     // i shd probably handle more case by case stuff here but i   literally cannot be bothered atm catplush
