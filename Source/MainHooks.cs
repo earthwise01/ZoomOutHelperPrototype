@@ -4,6 +4,7 @@ using System.Reflection;
 using Microsoft.Xna.Framework;
 using Monocle;
 using Celeste.Mod.Entities;
+using Celeste.Mod.Helpers;
 using MonoMod;
 using MonoMod.Cil;
 using MonoMod.RuntimeDetour;
@@ -44,7 +45,8 @@ public static class MainHooks {
         cursor.EmitFixCameraSizeFloatPadded(2);
 
         // jump to where rendering to the screen starts
-        cursor.GotoNext(instr => instr.MatchLdnull(), instr => instr.MatchCallOrCallvirt<GraphicsDevice>("SetRenderTarget"));
+        // cursor.GotoNextBestFit(MoveType.Before, instr => instr.MatchLdnull(), instr => instr.MatchCallOrCallvirt<GraphicsDevice>("SetRenderTarget"));
+        cursor.GotoNext(instr => instr.MatchCallOrCallvirt<Matrix>(nameof(Matrix.CreateScale)));
 
         // apply the scale (might also work but unused)
         // - Matrix matrix = Matrix.CreateScale(6f) * Engine.ScreenMatrix;
@@ -75,6 +77,11 @@ public static class MainHooks {
 
         // no mirror mode support yet,
         cursor.GotoNext(MoveType.After, instr => instr.MatchLdfld<Assists>(nameof(Assists.MirrorMode)));
+        // Console.WriteLine(il);
+        // cursor.GotoNext(MoveType.After, instr => instr.MatchLdcR4(160f));
+        // cursor.EmitDelegate(first160);
+        // cursor.GotoNext(MoveType.After, instr => instr.MatchLdcR4(160f));
+        // cursor.EmitDelegate(second160);
 
         // jump to when rendering the buffer to the screen
         cursor.GotoNext(instr => instr.MatchCallOrCallvirt<SpriteBatch>(nameof(SpriteBatch.Begin)));
@@ -93,6 +100,16 @@ public static class MainHooks {
         cursor.EmitLdloc(scaleLocal);
         cursor.EmitDelegate(drawBlackBars);
 
+        // vector3.X = 160f* - (vector3.X - 160f);
+        // static float first160(float orig) {
+        //     return 1000; //-0.0f * ((320 * FunctionalZoomOutModule.CanvasScale) - (320 * FunctionalZoomOutModule.CameraScale));
+        // }
+
+        // // vector3.X = 160f - (vector3.X - 160f*);
+        // static float second160(float orig) {
+        //     return 0;
+        // }
+
         static float applyScale(float orig) {
             if (!FunctionalZoomOutModule.ZoomOutActive)
                 return orig;
@@ -103,6 +120,10 @@ public static class MainHooks {
         static void drawBlackBars(Vector2 padding, float scale) {
             if (!FunctionalZoomOutModule.ZoomOutActive || padding == Vector2.Zero)
                 return;
+
+            // mirror mode
+            // padding.X = MathF.Abs(padding.X);
+            // padding.Y = MathF.Abs(padding.Y);
 
             // draws black bars around the edges because otherwise watchtower padding zoomout etc would reveal stuff offscreen
             Draw.SpriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.PointClamp, DepthStencilState.None, RasterizerState.CullNone, null, Engine.ScreenMatrix);
@@ -210,16 +231,17 @@ public static class MainHooks {
         ILCursor cursor = new(il);
         cursor.FixCameraDimensionsFloat();
 
-        cursor.GotoNext(MoveType.Before, instr => instr.MatchStfld<FMOD.VECTOR>("z"));
-        cursor.EmitDelegate(stolenAudioEdgeFadeFix);
+        cursor.GotoNext(MoveType.Before, instr => instr.MatchStfld<FMOD.VECTOR>("x"));
+        cursor.EmitDelegate(audioEdgeFadeFix);
+        cursor.GotoNext(MoveType.Before, instr => instr.MatchStfld<FMOD.VECTOR>("y"));
+        cursor.EmitDelegate(audioEdgeFadeFix);
 
-        // https://github.com/Ikersfletch/ExCameraDynamics/blob/8baf1291f3f81bf99a07df3f8a56c6c42de47534/Code/Hooks/CameraZoomHooks.cs#L377
-        // i really really want to avoid stealing stuff from excameradynamics typically but its probably for the best to have 100% parity for stuff like this
-        static float stolenAudioEdgeFadeFix(float orig) {
+        // different for how excameradynamics does it but more reliable i find for extremely large camera scales
+        static float audioEdgeFadeFix(float orig) {
             if (!FunctionalZoomOutModule.ZoomOutActive)
                 return orig;
 
-            return -MathF.Log(1f / FunctionalZoomOutModule.CameraScale);
+            return orig / FunctionalZoomOutModule.CameraScale;
         }
     }
 
