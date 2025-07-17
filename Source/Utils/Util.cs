@@ -24,8 +24,4 @@ public static class Util {
     public static Vector2 CameraDimensions => new(CameraWidth, CameraHeight);
 
     public static void SetCameraScale(float value) => FunctionalZoomOutModule.CameraScale = value;
-
-    public static void RegisterRenderTarget(VirtualRenderTarget vrt) => RenderTargetScaleManager.Track(vrt);
-    public static void RegisterRenderTargetPadded(VirtualRenderTarget vrt, int paddingSize) => RenderTargetScaleManager.Track(vrt, paddingSize);
-    public static void UnregisterRenderTarget(VirtualRenderTarget vrt) => RenderTargetScaleManager.Untrack(vrt);
 }

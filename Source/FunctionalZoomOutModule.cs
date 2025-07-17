@@ -158,9 +158,7 @@ public class FunctionalZoomOutModule : EverestModule {
         if (HooksActive) {
             Logger.Info("ZoomOutHelperPrototype", "unloading main hooks...");
             HookHelper.UnloadTag("mainZoomHooks");
-            HookHelper.UnloadTag("modHooks");
             SwapVanillaEffects(false);
-            RenderTargetScaleManager.UntrackAll();
         }
 
         HooksActive = loadHooks;
@@ -168,7 +166,6 @@ public class FunctionalZoomOutModule : EverestModule {
         if (loadHooks) {
             Logger.Info("ZoomOutHelperPrototype", "loading main hooks...");
             HookHelper.LoadTag("mainZoomHooks");
-            HookHelper.LoadTag("modHooks");
         }
     }
 
@@ -293,7 +290,6 @@ public class FunctionalZoomOutModule : EverestModule {
         // i really *really* should make it so that Level.Zoom / Level.ZoomTarget are used or at least set so that mod compat works with excameradynamics better but i am   so fkn exhausted right now bleh
 
         EnsureVanillaBuffers();
-        RenderTargetScaleManager.Update();
     }
 
     [OnHook(typeof(Level), nameof(Level.orig_LoadLevel), BindingFlags.Public | BindingFlags.Instance, tag: "mainZoomHooks")]
