@@ -6,50 +6,27 @@ using Monocle;
 using MonoMod.Utils;
 using Celeste.Mod.FunctionalZoomOut.Utils;
 using Microsoft.Xna.Framework.Graphics;
+using System.Collections.Generic;
 
 namespace Celeste.Mod.FunctionalZoomOut.ModCompat;
 
 // bweh i need to improve this still,
 public static class ModCompatManager {
-    private static readonly FrostHelperCompat FrostHelperCompat = new();
-    private static readonly MaddieHelpingHandCompat MaddieHelpingHandCompat = new();
-    private static readonly StyleMaskHelperCompat StyleMaskHelperCompat = new();
+    private static readonly List<ModCompatBase> ModCompatList = [
+        //new StyleMaskHelperCompat()
+    ];
 
     [HookLoadCallback("modHooks")]
     public static void Load() {
-        // dont load frosthelper hooks for newer versions
-        if (FrostHelperCompat.Module is not null && FrostHelperCompat.Module.Metadata.Version < new Version(1, 56, 0)) {
-            FrostHelperCompat.InitReflection();
-            FrostHelperCompat.Load();
-            Logger.Info("ZoomOutHelperPrototype", "loaded cross helper hooks for frost helper!");
-        }
-
-        if (MaddieHelpingHandCompat.Module is not null) {
-            MaddieHelpingHandCompat.InitReflection();
-            MaddieHelpingHandCompat.Load();
-            Logger.Info("ZoomOutHelperPrototype", "loaded cross helper hooks for maddie helping hand!");
-        }
-
-        if (StyleMaskHelperCompat.Module is not null) {
-            StyleMaskHelperCompat.InitReflection();
-            StyleMaskHelperCompat.Load();
-            Logger.Info("ZoomOutHelperPrototype", "loaded cross helper hooks for style mask helper!");
+        foreach (var modCompat in ModCompatList) {
+            modCompat.Load();
         }
     }
 
     [HookUnloadCallback("modHooks")]
     public static void Unload() {
-        FrostHelperCompat.Unload();
-        MaddieHelpingHandCompat.Unload();
-        StyleMaskHelperCompat.Unload();
+        foreach (var modCompat in ModCompatList) {
+            modCompat.Unload();
+        }
     }
-
-    public static Type GetExternalType(Assembly assembly, string name) {
-        var result = assembly.GetType(name);
-        if (result is null)
-            Logger.Warn("ZoomOutHelperPrototype", $"failed to find type {name}!");
-
-        return result;
-    }
-
 }

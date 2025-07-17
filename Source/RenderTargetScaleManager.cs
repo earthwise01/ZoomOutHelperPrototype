@@ -1,19 +1,7 @@
-using System;
-using System.Collections.Generic;
-using System.Reflection;
-using Microsoft.Xna.Framework;
-using Monocle;
-using Celeste.Mod.Entities;
-using MonoMod;
-using MonoMod.Cil;
-using MonoMod.RuntimeDetour;
-using Mono.Cecil.Cil;
-using Microsoft.Xna.Framework.Graphics;
-using MonoMod.Utils;
-using System.Linq;
 
 namespace Celeste.Mod.FunctionalZoomOut;
 
+// legacy but need to keep around until stylemask helper gets native zoomout support
 internal static class RenderTargetScaleManager {
     private class ScalableVRTWrapper {
         public VirtualRenderTarget RenderTarget { get; private set; }
@@ -66,7 +54,7 @@ internal static class RenderTargetScaleManager {
         scalableTarget = new ScalableVRTWrapper(vrt, padding);
         Tracked.Add(scalableTarget);
 
-        scalableTarget.Scale = FunctionalZoomOutModule.CanvasScale;
+        scalableTarget.Scale = Module.CanvasScale;
     }
 
     public static void Track(params VirtualRenderTarget[] vrts) {
@@ -102,7 +90,7 @@ internal static class RenderTargetScaleManager {
         }
 
         Tracked.Clear();
-        FunctionalZoomOutModule.SwapVanillaEffects(false);
+        // Module.SwapVanillaEffects(false);
     }
 
     internal static void Update() {
@@ -114,17 +102,17 @@ internal static class RenderTargetScaleManager {
             }
 
             // update the scale
-            scalableTarget.Scale = FunctionalZoomOutModule.CanvasScale;
+            scalableTarget.Scale = Module.CanvasScale;
         }
 
-        // maybe not the best place for this but it works
-        if (FunctionalZoomOutModule.CanvasScale != 1) {
-            FunctionalZoomOutModule.SwapVanillaEffects(true);
-        } else {
-            FunctionalZoomOutModule.SwapVanillaEffects(false);
-        }
+        // // maybe not the best place for this but it works
+        // if (Module.CanvasScale != 1) {
+        //     Module.SwapVanillaEffects(true);
+        // } else {
+        //     Module.SwapVanillaEffects(false);
+        // }
 
-        FunctionalZoomOutModule.FxDistortScalable.Parameters["scale"].SetValue(FunctionalZoomOutModule.CanvasScale);
+        // Module.FxDistortScalable.Parameters["scale"].SetValue(Module.CanvasScale);
     }
 
 #if DEBUG

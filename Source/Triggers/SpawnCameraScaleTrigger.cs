@@ -1,8 +1,3 @@
-using System;
-using Microsoft.Xna.Framework;
-using Monocle;
-using Celeste.Mod;
-using Celeste.Mod.FunctionalZoomOut.Utils;
 using Celeste.Mod.Entities;
 
 namespace Celeste.Mod.FunctionalZoomOut.Triggers;
@@ -27,12 +22,8 @@ public class SpawnCameraScaleTrigger : Trigger {
     }
 
     private static void Event_Player_Spawn(Player player) {
-        if (!FunctionalZoomOutModule.LevelContainsZoomOut)
-            return;
-
         var trigger = player.CollideFirst<SpawnCameraScaleTrigger>();
-        if (trigger is not null) {
-            FunctionalZoomOutModule.CameraScale = trigger.scale;
-        }
+        if (trigger is not null)
+            Module.CameraScale = trigger.scale;
     }
 }

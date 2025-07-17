@@ -36,7 +36,7 @@ public class StyleMaskHelperCompat : ModCompatBase {
 
     #region Load and Unload
 
-    public override void Load() {
+    protected override void LoadHooks() {
         if (Mask_GetVisibleRect is not null)
             hook_Mask_GetVisibleRect = new(Mask_GetVisibleRect, IL_Mask_GetVisibleRect);
 
@@ -52,7 +52,7 @@ public class StyleMaskHelperCompat : ModCompatBase {
             hook_StylegroundMaskRenderer_IsEntityInView = new(StylegroundMaskRenderer_IsEntityInView, IL_StylegroundMaskRenderer_IsEntityInView);
     }
 
-    public override void Unload() {
+    protected override void UnloadHooks() {
         hook_Mask_GetVisibleRect?.Dispose();
         hook_Mask_GetVisibleRect = null;
 
@@ -74,7 +74,7 @@ public class StyleMaskHelperCompat : ModCompatBase {
 
     private static void IL_Mask_GetVisibleRect(ILContext il) {
         ILCursor cursor = new(il);
-        cursor.FixCameraDimensionsInt();
+        cursor.FixAllCameraDimensionsInt();
     }
 
     private static void IL_StylegroundLightingHandler_GameplayBuffers_Create(ILContext il) {
@@ -115,7 +115,7 @@ public class StyleMaskHelperCompat : ModCompatBase {
 
     private static void IL_StylegroundMaskRenderer_IsEntityInView(ILContext il) {
         ILCursor cursor = new(il);
-        cursor.FixCameraDimensionsInt();
+        cursor.FixAllCameraDimensionsInt();
     }
 
     #endregion
@@ -128,22 +128,20 @@ public class StyleMaskHelperCompat : ModCompatBase {
     private static MethodInfo StylegroundMaskRenderer_GetBuffer;
     private static MethodInfo StylegroundMaskRenderer_IsEntityInView;
 
-    public override void InitReflection() {
-        var assembly = Module.GetType().Assembly;
-
-        Mask_GetVisibleRect = ModCompatManager.GetExternalType(assembly, "Celeste.Mod.StyleMaskHelper.Entities.Mask")?.GetMethod("GetVisibleRect", BindingFlags.Public | BindingFlags.Instance);
+    protected override void LoadReflection() {
+        Mask_GetVisibleRect = GetModdedType("Celeste.Mod.StyleMaskHelper.Entities.Mask")?.GetMethod("GetVisibleRect", BindingFlags.Public | BindingFlags.Instance);
         if (Mask_GetVisibleRect is null)
             Logger.Warn("ZoomOutHelperPrototype", "Couldn't find method GetVisibleRect in Celeste.Mod.StyleMaskHelper.Entities.Mask!");
 
-        StylegroundLightingHandler_GameplayBuffers_Create = ModCompatManager.GetExternalType(assembly, "Celeste.Mod.StyleMaskHelper.StylegroundLightingHandler")?.GetMethod("GameplayBuffers_Create", BindingFlags.NonPublic | BindingFlags.Static);
+        StylegroundLightingHandler_GameplayBuffers_Create = GetModdedType("Celeste.Mod.StyleMaskHelper.StylegroundLightingHandler")?.GetMethod("GameplayBuffers_Create", BindingFlags.NonPublic | BindingFlags.Static);
         if (StylegroundLightingHandler_GameplayBuffers_Create is null)
             Logger.Warn("ZoomOutHelperPrototype", "Couldn't find method GameplayBuffers_Create in Celeste.Mod.StyleMaskHelper.StylegroundLightingHandler!");
 
-        BloomMask_GameplayBuffers_Create = ModCompatManager.GetExternalType(assembly, "Celeste.Mod.StyleMaskHelper.Entities.BloomMask")?.GetMethod("GameplayBuffers_Create", BindingFlags.NonPublic | BindingFlags.Static);
+        BloomMask_GameplayBuffers_Create = GetModdedType("Celeste.Mod.StyleMaskHelper.Entities.BloomMask")?.GetMethod("GameplayBuffers_Create", BindingFlags.NonPublic | BindingFlags.Static);
         if (BloomMask_GameplayBuffers_Create is null)
             Logger.Warn("ZoomOutHelperPrototype", "Couldn't find method GameplayBuffers_Create in Celeste.Mod.StyleMaskHelper.Entities.BloomMask!");
 
-        var stylegroundMaskRendererType = ModCompatManager.GetExternalType(assembly, "Celeste.Mod.StyleMaskHelper.Entities.StylegroundMaskRenderer");
+        var stylegroundMaskRendererType = GetModdedType("Celeste.Mod.StyleMaskHelper.Entities.StylegroundMaskRenderer");
         StylegroundMaskRenderer_GetBuffer = stylegroundMaskRendererType?.GetMethod("GetBuffer", BindingFlags.Public | BindingFlags.Static);
         if (StylegroundMaskRenderer_GetBuffer is null)
             Logger.Warn("ZoomOutHelperPrototype", "Couldn't find method GetBuffer in Celeste.Mod.StyleMaskHelper.Entities.StylegroundMaskRenderer!");

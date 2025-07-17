@@ -1,0 +1,4 @@
+MODNAME_ZOOMOUTHELPERPROTOTYPE= zoom out helper "prototype"
+MODOPTIONS_ZOOMOUTHELPERPROTOTYPE_TITLE= zoom out helper "prototype"
+
+modsettings_zoomouthelper_camerascalemaximum_name= Maximum Camera Scale
