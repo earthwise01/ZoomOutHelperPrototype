@@ -77,8 +77,6 @@ public class FunctionalZoomOutModule : EverestModule {
             if (!HooksActive)
                 return;
 
-            value = 1f / value;
-
             if (Settings.CameraScaleMaximum > 0f)
                 value = Math.Min(value, Settings.CameraScaleMaximum);
 
