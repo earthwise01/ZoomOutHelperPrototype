@@ -53,6 +53,12 @@ public class FunctionalZoomOutModule : EverestModule {
         orig_FxDistort ??= GFX.FxDistort;
     }
 
+    public override void PrepareMapDataProcessors(MapDataFixup context) {
+        base.PrepareMapDataProcessors(context);
+
+        context.Add<FunctionalZoomOutMapDataProcessor>();
+    }
+
     #endregion
 
     #region Current Zoom Status
@@ -63,8 +69,8 @@ public class FunctionalZoomOutModule : EverestModule {
     // ...however extended camera dynamics already tried this at first and i feel like it ended up not being worth the issues it caused oops (especially styleground jitter i swear like i saw so many ppl switching over to hi res parallax to work around that)
     public static bool PixelPerfectZooming = true;
 
-    private static float TargetCameraScale;
-    private static float CurrentCameraScale;
+    internal static float TargetCameraScale;
+    internal static float CurrentCameraScale;
     public static bool CameraScaleChanged => CurrentCameraScale != TargetCameraScale;
 
     public static bool HooksActive { get; private set; } // if currently in a map containing zoom out and hooks are loaded
@@ -125,16 +131,7 @@ public class FunctionalZoomOutModule : EverestModule {
     public static float GetFixedCameraSizePadded(float orig, int padding) => GetFixedCameraSize(orig - padding) + padding;
     public static int GetFixedCameraSizeIntPadded(int orig, int padding) => (int)GetFixedCameraSize(orig - padding) + padding;
 
-    public static void EnsureBufferDimensions(VirtualRenderTarget target) {
-        if (target is null || target.IsDisposed || (target.Width == GameplayBufferWidth && target.Height == GameplayBufferHeight))
-            return;
-
-        target.Width = GameplayBufferWidth;
-        target.Height = GameplayBufferHeight;
-        target.Reload();
-    }
-
-    public static void EnsureBufferSize(VirtualRenderTarget target, int padding) {
+    public static void EnsureBufferDimensions(VirtualRenderTarget target, int padding = 0) {
         if (target is null || target.IsDisposed || (target.Width + padding == GameplayBufferWidth + padding && target.Height + padding == GameplayBufferHeight + padding))
             return;
 
@@ -240,16 +237,16 @@ public class FunctionalZoomOutModule : EverestModule {
     }
 
     // why am i even doing it like this
-    private static void UpdateLevelZoomOut(Level level) {
+    internal static void UpdateLevelZoomOut(Level level) {
         var player = level.Tracker.GetEntity<Player>();
         if (player is null) {
             // Logger.Info("ZoomOutHelperPrototype", "can't update zoom level with a null player!");
             return;
         }
 
-        var data = DynamicData.For(level);
+        // var data = DynamicData.For(level);
 
-        float? levelScale = (float?)data.Get("ZoomOutHelperPrototype_CurrentZoom");
+        // float? levelScale = (float?)data.Get("ZoomOutHelperPrototype_CurrentZoom");
         if (1f / level.Zoom != TargetCameraScale && (CurrentCameraScale != 1f || TargetCameraScale != 1f)) {
             // grab stuff from the current state
             var camera = level.Camera;
@@ -277,14 +274,14 @@ public class FunctionalZoomOutModule : EverestModule {
                 camera.Position = player.CameraTarget + diffFromTarget;
                 camera.X = MathHelper.Clamp(camera.X, level.Bounds.Left, level.Bounds.Right - camera.Viewport.Width);
                 camera.Y = MathHelper.Clamp(camera.Y, level.Bounds.Top, level.Bounds.Bottom - camera.Viewport.Height);
-            } else {
+            } else if (!level.Transitioning) {
                 camera.Position = cameraCenter - new Vector2(camera.Viewport.Width / 2f, camera.Viewport.Height / 2f);
             }
 
             camera.UpdateMatrices();
         }
 
-        data.Set("ZoomOutHelperPrototype_CurrentZoom", levelScale);
+        // data.Set("ZoomOutHelperPrototype_CurrentZoom", levelScale);
         // i really *really* should make it so that Level.Zoom / Level.ZoomTarget are used or at least set so that mod compat works with excameradynamics better but i am   so fkn exhausted right now bleh
 
         EnsureVanillaBuffers();
@@ -305,8 +302,8 @@ public class FunctionalZoomOutModule : EverestModule {
         EnsureBufferDimensions(GameplayBuffers.TempA);
         EnsureBufferDimensions(GameplayBuffers.TempB);
         // ??
-        EnsureBufferSize(GameplayBuffers.MirrorSources, 64);
-        EnsureBufferSize(GameplayBuffers.MirrorMasks, 64);
+        EnsureBufferDimensions(GameplayBuffers.MirrorSources, 64);
+        EnsureBufferDimensions(GameplayBuffers.MirrorMasks, 64);
 
         UpdateEffectSwap();
     }
