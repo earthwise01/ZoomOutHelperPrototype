@@ -397,8 +397,12 @@ public class FunctionalZoomOutModule : EverestModule {
             return;
         }
 
+        if (PixelPerfectZooming)
+            scale = MathF.Round(scale * 160f) / 160f;
+        var prevScale = CameraScale;
         CameraScale = scale;
-        Engine.Commands.Log($"set the target camera scale to {scale:N2}x");
+
+        Engine.Commands.Log($"set the target camera scale to {scale:N2}x! previous was {prevScale:N2}x.");
     }
 
     [Command($"fzo_force_enable", "forcefully enables FZO zoom out, even if it is not intended by the current map")]

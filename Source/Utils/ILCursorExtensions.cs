@@ -59,6 +59,12 @@ internal static class ILCursorExtensions {
     internal static void FixNextCameraDimensionsIntHalf(this ILCursor cursor) =>
         cursor.SearchAndEmit(EmitFixCameraSizeInt, instr => instr.MatchLdcI4(Celeste.GameWidth / 2) || instr.MatchLdcI4(Celeste.GameHeight / 2));
 
+    internal static void FixNextCanvasWidthInt(this ILCursor cursor) =>
+        cursor.SearchAndEmit(EmitFixCanvasSizeInt, instr => instr.MatchLdcI4(Celeste.GameWidth));
+    internal static void FixNextCanvasHeightInt(this ILCursor cursor) =>
+        cursor.SearchAndEmit(EmitFixCanvasSizeInt, instr => instr.MatchLdcI4(Celeste.GameHeight));
+
+
     // mass find and replace
 
     private static void SearchAndEmitAll(this ILCursor cursor, Action<ILCursor> emitterMethod, params Func<Instruction, bool>[] predicates) {

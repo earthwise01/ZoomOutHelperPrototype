@@ -108,24 +108,92 @@ internal static class BackdropHooks {
         cursor.EmitBrtrue(loopYStartLabel);
 
         static void resizeVertexBuffer(Godrays godrays) {
-            int visibleScreens = (int)Math.Ceiling(Module.GetFixedCameraSize(Celeste.GameWidth) / 320f);
-            int expectedBufferLength = Godrays.RayCount * 6 * 8;
+            int visibleScreens = (int)Math.Ceiling(Module.GetFixedCameraSize(Celeste.GameWidth) / 320f) * 2;
+            Console.WriteLine($"visible screens: {visibleScreens}");
+            int expectedBufferLength = Godrays.RayCount * 6 * visibleScreens;
             if (godrays.vertices.Length != expectedBufferLength)
                 godrays.vertices = new VertexPositionColor[expectedBufferLength];
         }
 
         static bool loopXHead(int x) {
-            int visibleScreens = 2; _ = (int)Math.Ceiling(Module.GetFixedCameraSize(Celeste.GameWidth) / 320f);
+            int visibleScreens = 2;
+            _ = (int)Math.Ceiling(Module.GetFixedCameraSize(Celeste.GameWidth) / 320f);
             Console.WriteLine($"x: {x}");
             return x < 320 * visibleScreens + 32;
         }
 
         static bool loopYHead(int y) {
-            int visibleScreens = 2; _ = (int)Math.Ceiling(Module.GetFixedCameraSize(Celeste.GameWidth) / 320f);
+            int visibleScreens = 2;
+            _ = (int)Math.Ceiling(Module.GetFixedCameraSize(Celeste.GameWidth) / 320f);
             Console.WriteLine($"y: {y}");
             return y < 180 * visibleScreens + 32;
         }
     }
 
-    // BlackholeBG
+    // Northern Lights
+
+    [ILHook(typeof(NorthernLights), nameof(NorthernLights.BeforeRender), BindingFlags.Public | BindingFlags.Instance, tag: "mainZoomHooks")]
+    private static void NorthernLights_BeforeRender(ILContext il) {
+        var cursor = new ILCursor(il);
+
+        // rescale the northern lights to match the camera scale (without making them seem to become higher resolution)
+
+        cursor.FixNextCanvasWidthInt();
+        cursor.FixNextCanvasHeightInt();
+        cursor.GotoNext(MoveType.After, i => i.MatchStfld<NorthernLights>(nameof(NorthernLights.buffer))).MoveAfterLabels();
+        cursor.EmitLdarg0();
+        cursor.EmitDelegate(resizeBufferIfNeeded);
+
+        static void resizeBufferIfNeeded(NorthernLights self) {
+            Module.EnsureBufferDimensions(self.buffer);
+        }
+
+        // upscale the backdrop before drawing the particles
+        cursor.Index = -1;
+        cursor.GotoPrev(MoveType.Before, i => i.MatchCallOrCallvirt<SpriteBatch>(nameof(SpriteBatch.Begin)));
+        cursor.EmitLdarg0();
+        cursor.EmitDelegate(upscaleBuffer);
+
+        static void upscaleBuffer(NorthernLights self) {
+            if (!Module.ZoomOutActive)
+                return;
+
+            Engine.Instance.GraphicsDevice.SetRenderTarget(self.buffer);
+
+            Draw.SpriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.PointClamp, DepthStencilState.None, RasterizerState.CullNone);
+            Draw.SpriteBatch.Draw(GameplayBuffers.TempB, Vector2.Zero, null, Color.White, 0f, Vector2.Zero, Module.CameraScale, SpriteEffects.None, 0f);
+            Draw.SpriteBatch.End();
+        }
+
+        // draw the northern lights to TempB rather than NorthernLights.buffer to prevent issues drawing a buffer to itself when upscaling
+        cursor.GotoPrev(MoveType.After, i => i.MatchLdfld<NorthernLights>(nameof(NorthernLights.buffer))); // blur output
+        cursor.EmitDelegate(swapBufferToTempB);
+        cursor.Index -= 2;
+        cursor.GotoPrev(MoveType.After, i => i.MatchLdfld<NorthernLights>(nameof(NorthernLights.buffer))); // blur input
+        cursor.EmitDelegate(swapBufferToTempB);
+        cursor.Index -= 2;
+        cursor.GotoPrev(MoveType.After, i => i.MatchLdfld<NorthernLights>(nameof(NorthernLights.buffer))); // SetRenderTarget before drawing the vertices
+        cursor.EmitDelegate(swapBufferToTempB);
+        cursor.Index -= 2;
+
+        static VirtualRenderTarget swapBufferToTempB(VirtualRenderTarget buffer) {
+            if (Module.ZoomOutActive)
+                return GameplayBuffers.TempB;
+
+            return buffer;
+        }
+
+        // todo: add looping to the particles
+    }
+
+    // TODO:
+    // - Finish Godrays (oops i noticed theres a consolewriteline and visiblescreens is always 2, same with expected buffer length being hardcoded)
+    // - Snow
+    // - Wind Snow
+    // - Stardust / Core Stars
+    // - Blackhole
+    // - Final Boss BG
+    // - Planets
+    // - Starfield
+    // - Old SIte Stars
 }
