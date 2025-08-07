@@ -108,24 +108,20 @@ internal static class BackdropHooks {
         cursor.EmitBrtrue(loopYStartLabel);
 
         static void resizeVertexBuffer(Godrays godrays) {
-            int visibleScreens = (int)Math.Ceiling(Module.GetFixedCameraSize(Celeste.GameWidth) / 320f) * 2;
-            Console.WriteLine($"visible screens: {visibleScreens}");
+            int visibleScreens = (int)Math.Ceiling(Module.GetFixedCameraSize(Celeste.GameWidth) / 320f);
+            visibleScreens *= visibleScreens;
             int expectedBufferLength = Godrays.RayCount * 6 * visibleScreens;
             if (godrays.vertices.Length != expectedBufferLength)
                 godrays.vertices = new VertexPositionColor[expectedBufferLength];
         }
 
         static bool loopXHead(int x) {
-            int visibleScreens = 2;
-            _ = (int)Math.Ceiling(Module.GetFixedCameraSize(Celeste.GameWidth) / 320f);
-            Console.WriteLine($"x: {x}");
+            int visibleScreens = (int)Math.Ceiling(Module.GetFixedCameraSize(Celeste.GameWidth) / 320f);;
             return x < 320 * visibleScreens + 32;
         }
 
         static bool loopYHead(int y) {
-            int visibleScreens = 2;
-            _ = (int)Math.Ceiling(Module.GetFixedCameraSize(Celeste.GameWidth) / 320f);
-            Console.WriteLine($"y: {y}");
+            int visibleScreens = (int)Math.Ceiling(Module.GetFixedCameraSize(Celeste.GameWidth) / 320f);;
             return y < 180 * visibleScreens + 32;
         }
     }
@@ -187,7 +183,6 @@ internal static class BackdropHooks {
     }
 
     // TODO:
-    // - Finish Godrays (oops i noticed theres a consolewriteline and visiblescreens is always 2, same with expected buffer length being hardcoded)
     // - Snow
     // - Wind Snow
     // - Stardust / Core Stars
