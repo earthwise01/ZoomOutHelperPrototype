@@ -6,6 +6,16 @@ namespace Celeste.Mod.FunctionalZoomOut.Hooks;
 
 internal static class CameraZoomHooks {
 
+    [HookLoadCallback("mainZoomHooks")]
+    internal static void LoadEvents() {
+        Everest.Events.Level.OnLoadLevel += Event_LoadLevel;
+    }
+
+    [HookUnloadCallback("mainZoomHooks")]
+    internal static void UnloadEvents() {
+        Everest.Events.Level.OnLoadLevel -= Event_LoadLevel;
+    }
+
     #region Camera Size
 
     [ILHook(typeof(Player), "get_" + nameof(Player.CameraTarget), BindingFlags.Public | BindingFlags.Instance, tag: "mainZoomHooks")]
@@ -258,6 +268,12 @@ internal static class CameraZoomHooks {
 
     #region Transition Routine
 
+    // forgot what this was supposed to be for (room zoom controller?)
+    private static void Event_LoadLevel(Level level, Player.IntroTypes playerIntro, bool isFromLoader) {
+        if (playerIntro == Player.IntroTypes.Transition)
+            return;
+    }
+
     // could definitely be better but works for now i suppose?
     // design details that still need to be figured out:
     // should room/initial zoom be treated differently to trigger set zoom? since right now camera scale persists between rooms, which makes sense when thinking of it like bloom where you control it with triggers but not so much a system where you place a controller in a room to give it a non-default zoom
@@ -347,7 +363,7 @@ internal static class CameraZoomHooks {
             Module.UpdateLevelZoomOut(level);
         }
 
-        Console.WriteLine(il);
+        // Console.WriteLine(il);
     }
 
 

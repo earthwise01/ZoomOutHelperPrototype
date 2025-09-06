@@ -405,7 +405,7 @@ public class FunctionalZoomOutModule : EverestModule {
         Engine.Commands.Log($"set the target camera scale to {scale:N2}x! previous was {prevScale:N2}x.");
     }
 
-    [Command($"fzo_force_enable", "forcefully enables FZO zoom out, even if it is not intended by the current map")]
+    [Command($"fzo_force_enable", "forcefully enables FZO zoom out, even if not intended by the current map")]
     public static void CommandForceEnable() {
         if (Engine.Scene is not Level) {
             Engine.Commands.Log("Cannot activate FZO zoom out while not in a Level!");
@@ -420,6 +420,14 @@ public class FunctionalZoomOutModule : EverestModule {
         ResetStaticFields();
         UpdateMainHooks(true);
         Engine.Commands.Log($"enabled FZO zoom out! use the command `fzo_set_camera_scale` to adjust the camera scale");
+    }
+
+    [Command($"fzo_is_active", "checks if FZO zoom out is enabled")]
+    public static void CommandIsActive() {
+        if (HooksActive)
+            Engine.Commands.Log("FZO zoom out is currently enabled!");
+        else
+            Engine.Commands.Log("FZO zoom out is currently disabled.");
     }
 
     #endregion
