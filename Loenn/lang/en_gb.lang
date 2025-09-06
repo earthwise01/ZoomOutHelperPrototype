@@ -1,7 +1,10 @@
-entities.ZoomOutHelperPrototype/GlobalZoomController.placements.name.globalZoomController=Global Zoom Controller
+entities.ZoomOutHelperPrototype/GlobalZoomController.placements.name.globalZoomController=Enable Zoom Out Controller
+entities.ZoomOutHelperPrototype/GlobalZoomController.placements.description.globalZoomController=Enables zoom out for the current map.\nGlobal (i.e. only one controller is expected per map)
+
 triggers.ZoomOutHelperPrototype/CameraScaleFadeTrigger.placements.name.cameraScaleFade=Camera Scale Fade
 triggers.ZoomOutHelperPrototype/CameraScaleFadeTrigger.placements.name.zoomOutFade=Zoom Out Fade
+
 triggers.ZoomOutHelperPrototype/SpawnCameraScaleTrigger.placements.name.spawnCameraScaleTrigger=Spawn Camera Scale
 triggers.ZoomOutHelperPrototype/SpawnCameraScaleTrigger.placements.name.spawnZoomTrigger=Spawn Zoom Out
 
-mods.ZoomOutHelperPrototype.name=Zoom Out Helper (Prototype)
+mods.ZoomOutHelperPrototype.name=zoom out helper "prototype"

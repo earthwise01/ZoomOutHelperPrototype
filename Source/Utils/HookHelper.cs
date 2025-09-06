@@ -175,28 +175,30 @@ internal static class HookHelper {
         public void Load() {
             Unload();
 
-            foreach (var loadCallback in loadCallbacks) {
-                loadCallback.Invoke();
+            try {
+                foreach (var loadCallback in loadCallbacks) {
+                    loadCallback.Invoke();
 
-                Logger.Info("ZoomOutHelperPrototype", $"[HookHelper] ran hook loading callback {loadCallback.Method.Name}!");
+                    Logger.Info("ZoomOutHelperPrototype", $"[HookHelper] ran hook loading callback {loadCallback.Method.Name}!");
+                }
+
+                foreach (var hookAttribute in hookAttributes) {
+                    if (hookAttribute.IsILHook)
+                        attributeILHooks.Add(new(hookAttribute.TargetMethod, hookAttribute.HookMethod.CreateDelegate<ILContext.Manipulator>()));
+                    else
+                        attributeOnHooks.Add(new(hookAttribute.TargetMethod, hookAttribute.HookMethod));
+
+                    Logger.Info("ZoomOutHelperPrototype", $"[HookHelper] loaded hook {hookAttribute.HookMethod.DeclaringType.Name}.{hookAttribute.HookMethod.Name} for {hookAttribute.TargetMethod.DeclaringType.Name}.{hookAttribute.TargetMethod.Name}!");
+                }
+
+                Loaded = true;
+            } catch {
+                Unload();
+                throw;
             }
-
-            foreach (var hookAttribute in hookAttributes) {
-                if (hookAttribute.IsILHook)
-                    attributeILHooks.Add(new(hookAttribute.TargetMethod, hookAttribute.HookMethod.CreateDelegate<ILContext.Manipulator>()));
-                else
-                    attributeOnHooks.Add(new(hookAttribute.TargetMethod, hookAttribute.HookMethod));
-
-                Logger.Info("ZoomOutHelperPrototype", $"[HookHelper] loaded hook {hookAttribute.HookMethod.DeclaringType.Name}.{hookAttribute.HookMethod.Name} for {hookAttribute.TargetMethod.DeclaringType.Name}.{hookAttribute.TargetMethod.Name}!");
-            }
-
-            Loaded = true;
         }
 
         public void Unload() {
-            if (!Loaded)
-                return;
-
             foreach (var ilHook in attributeILHooks)
                 ilHook?.Dispose();
             attributeILHooks.Clear();

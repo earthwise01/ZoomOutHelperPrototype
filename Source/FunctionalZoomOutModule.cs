@@ -1,31 +1,16 @@
-﻿using System;
-using System.Linq;
-using System.Reflection;
-using Microsoft.Xna.Framework;
-using Monocle;
-using MonoMod.Utils;
-using Celeste.Mod.FunctionalZoomOut.Utils;
-using Microsoft.Xna.Framework.Graphics;
-
-namespace Celeste.Mod.FunctionalZoomOut;
+﻿namespace Celeste.Mod.FunctionalZoomOut;
 
 public class FunctionalZoomOutModule : EverestModule {
 
     // mostly unused atm, just here in case i need to add backwards compatibility stuff in the future
-    internal const int ModVersionNumber = 1;
+    internal const int ModVersionNumber = 2;
 
     #region Instance/Settings/Session/SaveData
 
-    public static FunctionalZoomOutModule Instance { get; private set; }
+    public static Module Instance { get; private set; }
 
-    public override Type SettingsType => typeof(FunctionalZoomOutModuleSettings);
-    public static FunctionalZoomOutModuleSettings Settings => (FunctionalZoomOutModuleSettings)Instance._Settings;
-
-    public override Type SessionType => typeof(FunctionalZoomOutModuleSession);
-    public static FunctionalZoomOutModuleSession Session => (FunctionalZoomOutModuleSession)Instance._Session;
-
-    public override Type SaveDataType => typeof(FunctionalZoomOutModuleSaveData);
-    public static FunctionalZoomOutModuleSaveData SaveData => (FunctionalZoomOutModuleSaveData)Instance._SaveData;
+    public override Type SettingsType => typeof(FunctionalZoomOutSettings);
+    public static FunctionalZoomOutSettings Settings => (FunctionalZoomOutSettings)Instance._Settings;
 
     #endregion
 
@@ -45,22 +30,26 @@ public class FunctionalZoomOutModule : EverestModule {
     public override void Load() {
         HookHelper.Initialize(typeof(FunctionalZoomOutModule).Assembly);
         HookHelper.LoadTag("loader");
+
+        Everest.Events.Level.OnLoadEntity += Event_OnLoadEntity;
     }
 
     public override void Unload() {
         HookHelper.Uninitialize();
 
+        Everest.Events.Level.OnLoadEntity -= Event_OnLoadEntity;
+
         // reset the distort shader before unloading
-        if (EffectsSwapped && GFX.FxDistort is not null) {
-            GFX.FxDistort = orig_FxDistort;
-        }
-        EffectsSwapped = false;
+        SwapVanillaEffects(false);
+        orig_FxDistort = null;
+
+        FxDistortScalable?.Dispose();
+        FxDistortScalable = null;
     }
 
     public override void LoadContent(bool firstLoad) {
         base.LoadContent(firstLoad);
 
-        // ??= makes it only load once and not hot reload with the code mod but also means i don't have to worry abt it like creating extra copies when hot reloading either so
         FxDistortScalable ??= new(Engine.Graphics.GraphicsDevice, Everest.Content.Get("ZoomOutHelperPrototype:/Effects/FunctionalZoomOut/ZoomableDistort.fxb").Data) {
             Name = "Effects/FunctionalZoomOut/ZoomableDistort"
         };
@@ -68,35 +57,62 @@ public class FunctionalZoomOutModule : EverestModule {
         orig_FxDistort ??= GFX.FxDistort;
     }
 
-    internal static Effect orig_FxDistort;
-    internal static Effect FxDistortScalable;
+    public override void PrepareMapDataProcessors(MapDataFixup context) {
+        base.PrepareMapDataProcessors(context);
+
+        context.Add<FunctionalZoomOutMapDataProcessor>();
+    }
+
+    private static bool Event_OnLoadEntity(Level level, LevelData levelData, Vector2 offset, EntityData entityData) {
+        if (entityData.Name == "ZoomOutHelperPrototype/GlobalZoomController")
+            return true;
+
+        return false;
+    }
 
     #endregion
 
     #region Current Zoom Status
 
-    private static float TargetCameraScale { get; set; }
-    private static float CurrentCameraScale { get; set; }
+    // only allows camera scales which result in an even camera width
+    // technically makes zooming out more jittery but i feel like almost has the opposite effect since now the camera always expands by 1px on each side
+    // in theory if you want the *smoothest* possible zooming you need to make the camera be able to visually take a subpixel position!
+    // ...however extended camera dynamics already tried this at first and i feel like it ended up not being worth the issues it caused oops (especially styleground jitter i swear like i saw so many ppl switching over to hi res parallax to work around that)
+    public static bool PixelPerfectZooming = true;
 
-    public static bool LevelContainsZoomOut { get; private set; }
-    public static bool ZoomOutActive => LevelContainsZoomOut && CurrentCameraScale != 1f;
+    internal static float TargetCameraScale;
+    internal static float CurrentCameraScale;
+    public static bool CameraScaleChanged => CurrentCameraScale != TargetCameraScale;
+
+    public static bool HooksActive { get; private set; } // if currently in a map containing zoom out and hooks are loaded
+    public static bool ZoomOutActive => HooksActive && CurrentCameraScale != 1f; // if hooks are both loaded and zoom out is in use
     public static float CameraScale {
         get {
             return CurrentCameraScale;
         }
         set {
-            if (!LevelContainsZoomOut)
+            if (!HooksActive)
                 return;
+
+            if (Settings.CameraScaleMaximum > 0f)
+                value = Math.Min(value, Settings.CameraScaleMaximum);
+
+            if (PixelPerfectZooming)
+                value = MathF.Round(value * 160f) / 160f;
 
             TargetCameraScale = value;
         }
     }
-    public static float CanvasScale => (int)MathF.Ceiling(CurrentCameraScale);
+
+    public static int CanvasScale => (int)MathF.Ceiling(CurrentCameraScale);
+    public static int GameplayBufferWidth => Celeste.GameWidth * CanvasScale;
+    public static int GameplayBufferHeight => Celeste.GameHeight * CanvasScale;
+
+    public static Vector2 CenterFixOffset => new(MathF.Ceiling(Celeste.GameWidth / 2f * CameraScale) - Celeste.GameWidth / 2f, MathF.Ceiling(Celeste.GameHeight / 2f * CameraScale) - Celeste.GameHeight / 2f);
 
     public static void ResetStaticFields() {
         TargetCameraScale = 1f;
         CurrentCameraScale = 1f;
-        LevelContainsZoomOut = false;
     }
 
     // zoom getter methods
@@ -106,7 +122,7 @@ public class FunctionalZoomOutModule : EverestModule {
 
         return MathF.Ceiling(orig * CurrentCameraScale);
     }
-    public static float GetFixedCanvasSize(float orig) {
+    public static float GetFixedCanvasSizeFloat(float orig) {
         if (!ZoomOutActive)
             return orig;
 
@@ -120,39 +136,41 @@ public class FunctionalZoomOutModule : EverestModule {
     }
 
     public static int GetFixedCameraSizeInt(int orig) => (int)GetFixedCameraSize(orig);
-    public static int GetFixedCanvasSizeInt(int orig) => (int)GetFixedCanvasSize(orig);
+    public static int GetFixedCanvasSizeInt(int orig) => (int)GetFixedCanvasSizeFloat(orig);
 
     public static float GetFixedCameraSizePadded(float orig, int padding) => GetFixedCameraSize(orig - padding) + padding;
     public static int GetFixedCameraSizeIntPadded(int orig, int padding) => (int)GetFixedCameraSize(orig - padding) + padding;
 
+    public static void EnsureBufferDimensions(VirtualRenderTarget target, int padding = 0) {
+        if (target is null || target.IsDisposed || (target.Width + padding == GameplayBufferWidth + padding && target.Height + padding == GameplayBufferHeight + padding))
+            return;
+
+        target.Width = GameplayBufferWidth + padding;
+        target.Height = GameplayBufferHeight + padding;
+        target.Reload();
+    }
+
     #endregion
 
-    #region Loading/Unloading Zoom Out
-    // (e.g. hooks, shaders, gameplay buffers both global and not, etc. just anything related to loading stuff)
-
-    internal static bool MainHooksLoaded { get; private set; }
+    #region Loading/Unloading
 
     private static void UpdateMainHooks(bool loadHooks) {
-        LevelContainsZoomOut = loadHooks;
-
-        if (MainHooksLoaded == loadHooks) {
-            Logger.Debug("ZoomOutHelperPrototype", $"already in correct hook state ({(MainHooksLoaded ? "loaded" : "unloaded")}).");
+        if (HooksActive == loadHooks) {
+            Logger.Debug("ZoomOutHelperPrototype", $"already in correct hook state ({(HooksActive ? "loaded" : "unloaded")}).");
             return;
         }
 
-        if (MainHooksLoaded) {
+        if (HooksActive) {
             Logger.Info("ZoomOutHelperPrototype", "unloading main hooks...");
             HookHelper.UnloadTag("mainZoomHooks");
-            HookHelper.UnloadTag("modHooks");
-            RenderTargetScaleManager.UntrackAll();
+            SwapVanillaEffects(false);
         }
 
-        MainHooksLoaded = loadHooks;
+        HooksActive = loadHooks;
 
         if (loadHooks) {
             Logger.Info("ZoomOutHelperPrototype", "loading main hooks...");
             HookHelper.LoadTag("mainZoomHooks");
-            HookHelper.LoadTag("modHooks");
         }
     }
 
@@ -206,28 +224,11 @@ public class FunctionalZoomOutModule : EverestModule {
 
     #endregion
 
-    #region Updating Zoom Out Status
+    #region Updating
 
     [OnHook(typeof(Level), nameof(Level.Begin), tag: "mainZoomHooks")]
     private static void On_Level_Begin(On.Celeste.Level.orig_Begin orig, Level self) {
         orig(self);
-
-        if (LevelContainsZoomOut) {
-            RenderTargetScaleManager.Track(
-                GameplayBuffers.Gameplay,
-                GameplayBuffers.Level,
-                GameplayBuffers.ResortDust,
-                GameplayBuffers.Light,
-                GameplayBuffers.Displacement,
-                GameplayBuffers.SpeedRings,
-                GameplayBuffers.TempA,
-                GameplayBuffers.TempB
-            );
-            RenderTargetScaleManager.Track(GameplayBuffers.MirrorSources, 64);
-            RenderTargetScaleManager.Track(GameplayBuffers.MirrorMasks, 64);
-
-            // SwapEffects(true);
-        }
 
         // CurrentCameraScale = 1f;
         UpdateLevelZoomOut(self);
@@ -246,47 +247,54 @@ public class FunctionalZoomOutModule : EverestModule {
     }
 
     // why am i even doing it like this
-    private static void UpdateLevelZoomOut(Level level) {
+    internal static void UpdateLevelZoomOut(Level level) {
         var player = level.Tracker.GetEntity<Player>();
         if (player is null) {
             // Logger.Info("ZoomOutHelperPrototype", "can't update zoom level with a null player!");
             return;
         }
 
-        var data = DynamicData.For(level);
+        // var data = DynamicData.For(level);
 
-        float? levelScale = (float?)data.Get("ZoomOutHelperPrototype_CurrentZoom");
-        if (levelScale != TargetCameraScale) {
+        // float? levelScale = (float?)data.Get("ZoomOutHelperPrototype_CurrentZoom");
+        if (1f / level.Zoom != TargetCameraScale && (CurrentCameraScale != 1f || TargetCameraScale != 1f)) {
             // grab stuff from the current state
             var camera = level.Camera;
-            var cameraOffsetFromTarget = camera.Position - level.GetFullCameraTargetAt(player, player.Position);
+            var diffFromTarget = camera.Position - player.CameraTarget;
+            var cameraCenter = camera.Position + new Vector2(camera.Viewport.Width / 2f, camera.Viewport.Height / 2f);
 
             // update the scale variables
-            levelScale = CurrentCameraScale = TargetCameraScale;
+            CurrentCameraScale = TargetCameraScale;
+
+            // var prev = levelScale ?? TargetCameraScale;
+            // levelScale = CurrentCameraScale = prev + (TargetCameraScale - prev) * (1f - (float)Math.Pow(0.01f / 4f, Engine.DeltaTime));
 
             // update the camera size for culling, etc
             camera.Viewport.Width = GetFixedCameraSizeInt(Celeste.GameWidth);
             camera.Viewport.Height = GetFixedCameraSizeInt(Celeste.GameHeight);
 
+            // update level.Zoom
+            level.Zoom = level.ZoomTarget = 1f / CurrentCameraScale;
+            level.ZoomFocusPoint = new Vector2(level.Camera.Viewport.Width / 2f, level.Camera.Viewport.Height / 2f);
+
             // update the camera position
-            // camera can clip oob when chaning zoom scale atm, need to work on that
             // tbf in general i could probably handle this better
-            camera.Position = level.GetFullCameraTargetAt(player, player.Position) + cameraOffsetFromTarget;
-            enforceLevelBounds(level, player, camera);
+            // enforce level bounds
+            if (!level.Transitioning && player.EnforceLevelBounds) {
+                camera.Position = player.CameraTarget + diffFromTarget;
+                camera.X = MathHelper.Clamp(camera.X, level.Bounds.Left, level.Bounds.Right - camera.Viewport.Width);
+                camera.Y = MathHelper.Clamp(camera.Y, level.Bounds.Top, level.Bounds.Bottom - camera.Viewport.Height);
+            } else if (!level.Transitioning) {
+                camera.Position = cameraCenter - new Vector2(camera.Viewport.Width / 2f, camera.Viewport.Height / 2f);
+            }
+
             camera.UpdateMatrices();
         }
 
-        data.Set("ZoomOutHelperPrototype_CurrentZoom", levelScale);
+        // data.Set("ZoomOutHelperPrototype_CurrentZoom", levelScale);
         // i really *really* should make it so that Level.Zoom / Level.ZoomTarget are used or at least set so that mod compat works with excameradynamics better but i am   so fkn exhausted right now bleh
 
-        RenderTargetScaleManager.Update();
-
-        static void enforceLevelBounds(Level level, Player player, Camera camera) {
-            if (!level.Transitioning && player.EnforceLevelBounds) {
-                camera.X = MathHelper.Clamp(camera.X, level.Bounds.Left, level.Bounds.Right - 320);
-                camera.Y = MathHelper.Clamp(camera.Y, level.Bounds.Top, level.Bounds.Bottom - 180);
-            }
-        }
+        EnsureVanillaBuffers();
     }
 
     [OnHook(typeof(Level), nameof(Level.orig_LoadLevel), BindingFlags.Public | BindingFlags.Instance, tag: "mainZoomHooks")]
@@ -295,33 +303,60 @@ public class FunctionalZoomOutModule : EverestModule {
         UpdateLevelZoomOut(self);
     }
 
+    private static void EnsureVanillaBuffers() {
+        EnsureBufferDimensions(GameplayBuffers.Gameplay);
+        EnsureBufferDimensions(GameplayBuffers.Level);
+        EnsureBufferDimensions(GameplayBuffers.Light);
+        EnsureBufferDimensions(GameplayBuffers.Displacement);
+        EnsureBufferDimensions(GameplayBuffers.ResortDust);
+        EnsureBufferDimensions(GameplayBuffers.TempA);
+        EnsureBufferDimensions(GameplayBuffers.TempB);
+        // ??
+        EnsureBufferDimensions(GameplayBuffers.MirrorSources, 64);
+        EnsureBufferDimensions(GameplayBuffers.MirrorMasks, 64);
+
+        UpdateEffectSwap();
+    }
+
     #endregion
 
-    #region stuff for swapping fxdistort
+    #region FxDistort Swapping
 
-    private static bool EffectsSwapped = false;
+    private static void UpdateEffectSwap() {
+        if (CanvasScale != 1) {
+            SwapVanillaEffects(true);
+        } else {
+            SwapVanillaEffects(false);
+        }
+
+        FxDistortScalable.Parameters["scale"].SetValue((float)CanvasScale);
+    }
+
+    private static bool effectsSwapped = false;
+    internal static Effect orig_FxDistort;
+    internal static Effect FxDistortScalable;
 
     internal static void SwapVanillaEffects(bool swap) {
-        if (EffectsSwapped == swap)
+        if (effectsSwapped == swap)
             return;
         //Logger.Info("ZoomOutHelperPrototype", $"effects are already swapped/unswapped ({swap})");
 
         if (swap) {
-            EffectsSwapped = true;
-
             if (GFX.FxDistort != orig_FxDistort)
                 Logger.Warn("ZoomOutHelperPrototype", "GFX.FxDistort refers to an unexpected shader! (i.e. not equal to orig_FxDistort)");
 
             CopyEffectParams(orig_FxDistort, FxDistortScalable, "text", "map", "scale");
             GFX.FxDistort = FxDistortScalable;
-        } else {
-            EffectsSwapped = false;
 
+            effectsSwapped = true;
+        } else {
             if (GFX.FxDistort != FxDistortScalable)
                 Logger.Warn("ZoomOutHelperPrototype", "GFX.FxDistort refers to an unexpected shader! (i.e. it is not equal to FxDistortScalable)");
 
             CopyEffectParams(FxDistortScalable, orig_FxDistort, "text", "map", "scale");
             GFX.FxDistort = orig_FxDistort;
+
+            effectsSwapped = false;
         }
     }
 
@@ -352,25 +387,68 @@ public class FunctionalZoomOutModule : EverestModule {
                 default:
                     // not implemented yet
                     break;
-            };
+            }
         }
     }
 
     #endregion
 
-    [Command($"set_camera_scale", "sets the camera scale (for zoom out)")]
-    public static void SetZoomOutCommand(float scale = 1f) {
-        if (!LevelContainsZoomOut) {
-            Engine.Commands.Log($"not in a valid level! (i.e. a level containing a global zoom controller)");
+    #region Commands
+
+    [Command($"fzo_get_camera_scale", "gets the FZO zoom out camera scale")]
+    public static void CommandSetCameraScale() {
+        if (!HooksActive) {
+            Engine.Commands.Log($"FZO zoom out is not currently active.");
+            return;
+        }
+
+        Engine.Commands.Log($"the current camera scale is {CameraScale:N2}x.");
+    }
+
+    [Command($"fzo_set_camera_scale", "sets the FZO zoom out camera scale")]
+    public static void CommandSetCameraScale(float scale = 1f) {
+        if (!HooksActive) {
+            Engine.Commands.Log($"FZO zoom out is not active! make sure to place a Global Zoom Controller, or if you're using extended camera dynamics to use its own commands instead!");
             return;
         }
 
         if (scale <= 0f) {
-            Engine.Commands.Log($"invalid scale! only scales above 0.00 are supported");
+            Engine.Commands.Log($"invalid scale! only scales above 0x are supported");
             return;
         }
 
+        if (PixelPerfectZooming)
+            scale = MathF.Round(scale * 160f) / 160f;
+        var prevScale = CameraScale;
         CameraScale = scale;
-        Engine.Commands.Log($"set the target camera scale to {scale:N2}");
+
+        Engine.Commands.Log($"set the target camera scale to {scale:N2}x! previous was {prevScale:N2}x.");
     }
+
+    [Command($"fzo_force_enable", "forcefully enables FZO zoom out, even if not intended by the current map")]
+    public static void CommandForceEnable() {
+        if (Engine.Scene is not Level) {
+            Engine.Commands.Log("Cannot activate FZO zoom out while not in a Level!");
+            return;
+        }
+
+        if (HooksActive) {
+            Engine.Commands.Log($"FZO zoom out is already active!");
+            return;
+        }
+
+        ResetStaticFields();
+        UpdateMainHooks(true);
+        Engine.Commands.Log($"enabled FZO zoom out! use the command `fzo_set_camera_scale` to adjust the camera scale");
+    }
+
+    [Command($"fzo_is_active", "checks if FZO zoom out is enabled")]
+    public static void CommandIsActive() {
+        if (HooksActive)
+            Engine.Commands.Log("FZO zoom out is currently enabled!");
+        else
+            Engine.Commands.Log("FZO zoom out is currently disabled.");
+    }
+
+    #endregion
 }
