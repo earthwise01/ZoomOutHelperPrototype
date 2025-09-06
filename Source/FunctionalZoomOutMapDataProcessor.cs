@@ -12,7 +12,7 @@ public class FunctionalZoomOutMapDataProcessor : EverestMapDataProcessor {
 
             currentMapValues[levelName] = cameraScale;
 
-            Logger.Error("ZoomOutHelperPrototype", $"[MapDataProcessor] found a RoomZoomController with camera scale {cameraScale} in room {levelName} in map {AreaKey.SID} ({AreaKey.Mode})!");
+            Logger.Info("ZoomOutHelperPrototype", $"[MapDataProcessor] found a RoomZoomController with camera scale {cameraScale} in room {levelName} in map {AreaKey.SID} ({AreaKey.Mode})!");
         }
 
         return new Dictionary<string, Action<BinaryPacker.Element>> {

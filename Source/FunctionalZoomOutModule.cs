@@ -30,10 +30,14 @@ public class FunctionalZoomOutModule : EverestModule {
     public override void Load() {
         HookHelper.Initialize(typeof(FunctionalZoomOutModule).Assembly);
         HookHelper.LoadTag("loader");
+
+        Everest.Events.Level.OnLoadEntity += Event_OnLoadEntity;
     }
 
     public override void Unload() {
         HookHelper.Uninitialize();
+
+        Everest.Events.Level.OnLoadEntity -= Event_OnLoadEntity;
 
         // reset the distort shader before unloading
         SwapVanillaEffects(false);
@@ -57,6 +61,13 @@ public class FunctionalZoomOutModule : EverestModule {
         base.PrepareMapDataProcessors(context);
 
         context.Add<FunctionalZoomOutMapDataProcessor>();
+    }
+
+    private static bool Event_OnLoadEntity(Level level, LevelData levelData, Vector2 offset, EntityData entityData) {
+        if (entityData.Name == "ZoomOutHelperPrototype/GlobalZoomController")
+            return true;
+
+        return false;
     }
 
     #endregion
@@ -102,7 +113,6 @@ public class FunctionalZoomOutModule : EverestModule {
     public static void ResetStaticFields() {
         TargetCameraScale = 1f;
         CurrentCameraScale = 1f;
-        HooksActive = false;
     }
 
     // zoom getter methods
