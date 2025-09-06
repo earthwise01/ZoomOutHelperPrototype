@@ -385,6 +385,16 @@ public class FunctionalZoomOutModule : EverestModule {
 
     #region Commands
 
+    [Command($"fzo_get_camera_scale", "gets the FZO zoom out camera scale")]
+    public static void CommandSetCameraScale() {
+        if (!HooksActive) {
+            Engine.Commands.Log($"FZO zoom out is not currently active.");
+            return;
+        }
+
+        Engine.Commands.Log($"the current camera scale is {CameraScale:N2}x.");
+    }
+
     [Command($"fzo_set_camera_scale", "sets the FZO zoom out camera scale")]
     public static void CommandSetCameraScale(float scale = 1f) {
         if (!HooksActive) {

@@ -2,3 +2,5 @@ MODNAME_ZOOMOUTHELPERPROTOTYPE= zoom out helper "prototype"
 MODOPTIONS_ZOOMOUTHELPERPROTOTYPE_TITLE= zoom out helper "prototype"
 
 modsettings_zoomouthelper_camerascalemaximum_name= Maximum Camera Scale
+# could be better probably but i'm sleepy and this does the job
+modsettings_zoomouthelper_camerascalemaximum_desc= Warning! This will reset the next time the game is launched.{n}Temporarily set a maximum scale for the camera.{n}This can break the intended experience of a map,{n}but might be useful in the unlikely case of a very large{n}camera scale causing an unplayable amount of lag.
