@@ -1,3 +1,5 @@
+using Mono.Cecil;
+
 namespace Celeste.Mod.FunctionalZoomOut.Hooks;
 
 internal static class BackdropHooks {
@@ -49,6 +51,22 @@ internal static class BackdropHooks {
         // cursor.GotoNext(MoveType.AfterLabel, i => i.MatchRet());
         cursor.EmitLdarg0();
         cursor.EmitDelegate(resizeVertexBuffer);
+
+        // fix parallax
+        cursor.GotoNext(MoveType.After, i => i.MatchStloc(7));
+
+        static float addCenterFixX(float x) => x + Module.CenterFixOffset.X;
+        static float addCenterFixY(float y) => y + Module.CenterFixOffset.Y;
+
+        cursor.GotoNext(MoveType.After, i => i.MatchCallOrCallvirt<Camera>("get_X"));
+        cursor.EmitDelegate(addCenterFixX);
+        cursor.GotoNext(MoveType.After, i => i.MatchSub());
+        cursor.EmitDelegate(addCenterFixX);
+
+        cursor.GotoNext(MoveType.After, i => i.MatchCallOrCallvirt<Camera>("get_Y"));
+        cursor.EmitDelegate(addCenterFixY);
+        cursor.GotoNext(MoveType.After, i => i.MatchSub());
+        cursor.EmitDelegate(addCenterFixY);
 
         // makeshift for loop to repeat the godrays
         var loopXHeadLabel = cursor.DefineLabel();
@@ -116,12 +134,12 @@ internal static class BackdropHooks {
         }
 
         static bool loopXHead(int x) {
-            int visibleScreens = (int)Math.Ceiling(Module.GetFixedCameraSize(Celeste.GameWidth) / 320f);;
+            int visibleScreens = (int)Math.Ceiling(Module.GetFixedCameraSize(Celeste.GameWidth) / 320f);
             return x < 320 * visibleScreens + 32;
         }
 
         static bool loopYHead(int y) {
-            int visibleScreens = (int)Math.Ceiling(Module.GetFixedCameraSize(Celeste.GameWidth) / 320f);;
+            int visibleScreens = (int)Math.Ceiling(Module.GetFixedCameraSize(Celeste.GameWidth) / 320f);
             return y < 180 * visibleScreens + 32;
         }
     }
@@ -179,13 +197,106 @@ internal static class BackdropHooks {
             return buffer;
         }
 
-        // todo: add looping to the particles
+        // also apply looping to the particles
+        Apply1x1ParticleLooping(il, true);
+    }
+
+    [ILHook(typeof(Snow), nameof(Snow.Render), BindingFlags.Public | BindingFlags.Instance, tag: "mainZoomHooks")]
+    [ILHook(typeof(CoreStarsFG), nameof(CoreStarsFG.Render), BindingFlags.Public | BindingFlags.Instance, tag: "mainZoomHooks")]
+    [ILHook(typeof(StardustFG), nameof(StardustFG.Render), BindingFlags.Public | BindingFlags.Instance, tag: "mainZoomHooks")]
+    private static void Snow_CoreStarsFG_StardustFG_Render(ILContext il) => Apply1x1ParticleLooping(il, false);
+
+    private static void Apply1x1ParticleLooping(ILContext il, bool hasParallax) {
+        var cursor = new ILCursor(il);
+
+        // regret
+        var loopXHeadLabel = cursor.DefineLabel();
+        var loopXStartLabel = cursor.DefineLabel();
+        var loopYHeadLabel = cursor.DefineLabel();
+        var loopYStartLabel = cursor.DefineLabel();
+        var loopX = new VariableDefinition(il.Import(typeof(int)));
+        var loopY = new VariableDefinition(il.Import(typeof(int)));
+        il.Body.Variables.Add(loopX);
+        il.Body.Variables.Add(loopY);
+
+        // jump to where the loop should start (right after `Camera camera = (scene as Level).Camera;`)
+        cursor.GotoNextBestFit(MoveType.After, i => i.MatchLdfld<Level>(nameof(Level.Camera)), i => i.MatchStloc(out _));
+        // y start
+        cursor.EmitLdcI4(0);
+        cursor.EmitStloc(loopY);
+        cursor.EmitBr(loopYHeadLabel);
+        cursor.MarkLabel(loopYStartLabel);
+        // x start
+        cursor.EmitLdcI4(0);
+        cursor.EmitStloc(loopX);
+        cursor.EmitBr(loopXHeadLabel);
+        cursor.MarkLabel(loopXStartLabel);
+
+        // add loop variables and center fix offset (if needed)
+        static float addCenterFixX(float x) => x + Module.CenterFixOffset.X;
+        static float addCenterFixY(float y) => y + Module.CenterFixOffset.Y;
+
+        if (hasParallax) {
+            cursor.GotoNext(MoveType.After, i => i.MatchCallOrCallvirt<Camera>("get_X"));
+            cursor.EmitDelegate(addCenterFixX);
+            cursor.GotoNext(MoveType.After, i => i.MatchSub());
+            cursor.EmitDelegate(addCenterFixX);
+        }
+        cursor.GotoNext(MoveType.After, i => i.OpCode == OpCodes.Callvirt && (i.Operand as MethodReference).Name == "mod");
+        cursor.EmitLdloc(loopX);
+        cursor.EmitConvR4();
+        cursor.EmitAdd();
+
+        if (hasParallax) {
+            cursor.GotoNext(MoveType.After, i => i.MatchCallOrCallvirt<Camera>("get_Y"));
+            cursor.EmitDelegate(addCenterFixY);
+            cursor.GotoNext(MoveType.After, i => i.MatchSub());
+            cursor.EmitDelegate(addCenterFixY);
+        }
+        cursor.GotoNext(MoveType.After, i => i.OpCode == OpCodes.Callvirt && (i.Operand as MethodReference).Name == "mod");
+        cursor.EmitLdloc(loopY);
+        cursor.EmitConvR4();
+        cursor.EmitAdd();
+
+
+        // jump to where the loop ends/heads should go
+        cursor.GotoNext(MoveType.After, i => i.MatchBlt(out _));
+
+        // x end
+        cursor.EmitLdloc(loopX);
+        cursor.EmitLdcI4(320);
+        cursor.EmitAdd();
+        cursor.EmitStloc(loopX);
+        // x head
+        cursor.MarkLabel(loopXHeadLabel);
+        cursor.EmitLdloc(loopX);
+        cursor.EmitDelegate(loopXHead);
+        cursor.EmitBrtrue(loopXStartLabel);
+
+        // y end
+        cursor.EmitLdloc(loopY);
+        cursor.EmitLdcI4(180);
+        cursor.EmitAdd();
+        cursor.EmitStloc(loopY);
+        // y head
+        cursor.MarkLabel(loopYHeadLabel);
+        cursor.EmitLdloc(loopY);
+        cursor.EmitDelegate(loopYHead);
+        cursor.EmitBrtrue(loopYStartLabel);
+
+        static bool loopXHead(int x) {
+            int visibleScreens = (int)Math.Ceiling(Module.GetFixedCameraSize(Celeste.GameWidth) / 320f);
+            return x < 320 * visibleScreens;
+        }
+
+        static bool loopYHead(int y) {
+            int visibleScreens = (int)Math.Ceiling(Module.GetFixedCameraSize(Celeste.GameWidth) / 320f);
+            return y < 180 * visibleScreens;
+        }
     }
 
     // TODO:
-    // - Snow
     // - Wind Snow
-    // - Stardust / Core Stars
     // - Blackhole
     // - Final Boss BG
     // - Planets
