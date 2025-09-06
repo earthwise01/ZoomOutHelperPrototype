@@ -59,29 +59,19 @@ internal static class RendererHooks {
             instr => instr.MatchLdarg(out _),
             instr => instr.MatchLdfld<Level>("ScreenPadding"));
 
-        // no mirror mode support yet,
         cursor.GotoNext(MoveType.After, instr => instr.MatchLdfld<Assists>(nameof(Assists.MirrorMode)));
-        // Console.WriteLine(il);
-        // cursor.GotoNext(MoveType.After, instr => instr.MatchLdcR4(160f));
-        // cursor.EmitDelegate(first160);
-        // cursor.GotoNext(MoveType.After, instr => instr.MatchLdcR4(160f));
-        // cursor.EmitDelegate(second160);
 
         // jump to when rendering the buffer to the screen
         cursor.GotoNext(instr => instr.MatchCallOrCallvirt<SpriteBatch>(nameof(SpriteBatch.Begin)));
 
-        // cursor.GotoNext(MoveType.Before, instr => instr.MatchLdsfld(typeof(GameplayBuffers), nameof(GameplayBuffers.Level)), instr => instr.MatchCallOrCallvirt<VirtualRenderTarget>("get_Bounds"));
-        // cursor.EmitDelegate((Vector2 orig) => {
-        //     var cameraW = 320 * Module.CameraScale;
-        //     var cameraH = 180 * Module.CameraScale;
-        //     return new Vector2(MathF.Ceiling(cameraW) - cameraW, MathF.Ceiling(cameraH) - cameraH) * -0.5f;
-        // });
-
-        // apply the scale
-        // - Draw.SpriteBatch.Draw(... scale ...);
-        // + Draw.SpriteBatch.Draw(... scale / CurrentCameraScale ...);
         cursor.GotoNext(MoveType.After, instr => instr.MatchLdloc(scaleLocal));
-        // cursor.EmitDelegate(applyScale);
+        cursor.GotoPrev(MoveType.After, instr => instr.MatchLdloc(5));
+        cursor.EmitDelegate(fixMirrorModeHopefully);
+
+        static Vector2 fixMirrorModeHopefully(Vector2 orig) {
+            orig.X *= Module.CanvasScale;
+            return orig;
+        }
 
         // draw black bars around the edges, since otherwise watchtowers can let stuff offscreen leak in
         //   Draw.SpriteBatch.End();
@@ -90,22 +80,6 @@ internal static class RendererHooks {
         cursor.EmitLdloc(paddingLocal);
         cursor.EmitDelegate(drawBlackBars);
 
-        // vector3.X = 160f* - (vector3.X - 160f);
-        // static float first160(float orig) {
-        //     return 1000; //-0.0f * ((320 * FunctionalZoomOutModule.CanvasScale) - (320 * FunctionalZoomOutModule.CameraScale));
-        // }
-
-        // // vector3.X = 160f - (vector3.X - 160f*);
-        // static float second160(float orig) {
-        //     return 0;
-        // }
-
-        // static float applyScale(float orig) {
-        //     if (!Module.ZoomOutActive)
-        //         return orig;
-
-        //     return orig / Module.CameraScale;
-        // }
 
         static void drawBlackBars(Vector2 padding) {
             if (!Module.ZoomOutActive || padding == Vector2.Zero)
