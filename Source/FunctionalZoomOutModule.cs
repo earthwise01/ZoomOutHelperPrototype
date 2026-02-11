@@ -1,4 +1,7 @@
-﻿namespace Celeste.Mod.FunctionalZoomOut;
+﻿using Celeste.Mod.FunctionalZoomOut.Interop;
+using MonoMod.ModInterop;
+
+namespace Celeste.Mod.FunctionalZoomOut;
 
 public class FunctionalZoomOutModule : EverestModule {
 
@@ -30,6 +33,8 @@ public class FunctionalZoomOutModule : EverestModule {
     public override void Load() {
         HookHelper.Initialize(typeof(FunctionalZoomOutModule).Assembly);
         HookHelper.LoadTag("loader");
+
+        typeof(MotionSmoothingImports).ModInterop();
 
         Everest.Events.Level.OnLoadEntity += Event_OnLoadEntity;
     }
@@ -141,13 +146,19 @@ public class FunctionalZoomOutModule : EverestModule {
     public static float GetFixedCameraSizePadded(float orig, int padding) => GetFixedCameraSize(orig - padding) + padding;
     public static int GetFixedCameraSizeIntPadded(int orig, int padding) => (int)GetFixedCameraSize(orig - padding) + padding;
 
-    public static void EnsureBufferDimensions(VirtualRenderTarget target, int padding = 0) {
-        if (target is null || target.IsDisposed || (target.Width + padding == GameplayBufferWidth + padding && target.Height + padding == GameplayBufferHeight + padding))
-            return;
+    public static bool EnsureBufferDimensions(VirtualRenderTarget target, int padding = 0) {
+        if (target == null)
+            return false;
+
+        target = MotionSmoothingImports.GetResizableBuffer?.Invoke(target) ?? target;
+
+        if (target.IsDisposed || (target.Width + padding == GameplayBufferWidth + padding && target.Height + padding == GameplayBufferHeight + padding))
+            return false;
 
         target.Width = GameplayBufferWidth + padding;
         target.Height = GameplayBufferHeight + padding;
         target.Reload();
+        return true;
     }
 
     #endregion
@@ -304,18 +315,23 @@ public class FunctionalZoomOutModule : EverestModule {
     }
 
     private static void EnsureVanillaBuffers() {
-        EnsureBufferDimensions(GameplayBuffers.Gameplay);
-        EnsureBufferDimensions(GameplayBuffers.Level);
+        bool needToReloadLargeTextures = false;
+
+        needToReloadLargeTextures |= EnsureBufferDimensions(GameplayBuffers.Gameplay);
+        needToReloadLargeTextures |= EnsureBufferDimensions(GameplayBuffers.Level);
         EnsureBufferDimensions(GameplayBuffers.Light);
         EnsureBufferDimensions(GameplayBuffers.Displacement);
         EnsureBufferDimensions(GameplayBuffers.ResortDust);
-        EnsureBufferDimensions(GameplayBuffers.TempA);
-        EnsureBufferDimensions(GameplayBuffers.TempB);
+        needToReloadLargeTextures |= EnsureBufferDimensions(GameplayBuffers.TempA);
+        needToReloadLargeTextures |= EnsureBufferDimensions(GameplayBuffers.TempB);
         // ??
         EnsureBufferDimensions(GameplayBuffers.MirrorSources, 64);
         EnsureBufferDimensions(GameplayBuffers.MirrorMasks, 64);
 
         UpdateEffectSwap();
+
+        if (needToReloadLargeTextures)
+            MotionSmoothingImports.ReloadLargeTextures?.Invoke();
     }
 
     #endregion
