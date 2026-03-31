@@ -20,7 +20,7 @@ internal static class CameraZoomHooks {
 
     [ILHook(typeof(Player), "get_" + nameof(Player.CameraTarget), BindingFlags.Public | BindingFlags.Instance, tag: "mainZoomHooks")]
     private static void Player_get_CameraTarget(ILContext il) {
-        ILCursor cursor = new(il);
+        ILCursor cursor = new ILCursor(il);
         cursor.FixAllCameraDimensionsFloat();
         cursor.FixAllCameraDimensionsInt();
         cursor.FixAllCameraDimensionsFloatHalf();
@@ -57,7 +57,7 @@ internal static class CameraZoomHooks {
 
         Vector2 origCameraAnchor = self.CameraAnchor;
         self.CameraAnchor -= Module.CenterFixOffset;
-        var result = orig(self);
+        Vector2 result = orig(self);
         self.CameraAnchor = origCameraAnchor;
         return result;
     }
@@ -65,14 +65,14 @@ internal static class CameraZoomHooks {
 
     [ILHook(typeof(Level), nameof(Level.EnforceBounds), BindingFlags.Public | BindingFlags.Instance, tag: "mainZoomHooks")]
     private static void Level_EnforceBounds(ILContext il) {
-        ILCursor cursor = new(il);
+        ILCursor cursor = new ILCursor(il);
         cursor.FixAllCameraDimensionsInt();
     }
 
     [ILHook(typeof(Level), nameof(Level.ScreenToWorld), BindingFlags.Public | BindingFlags.Instance, tag: "mainZoomHooks")]
     [ILHook(typeof(Level), nameof(Level.WorldToScreen), BindingFlags.Public | BindingFlags.Instance, tag: "mainZoomHooks")]
     private static void Level_ScreenToWorld_WorldToScreen(ILContext il) {
-        ILCursor cursor = new(il);
+        ILCursor cursor = new ILCursor(il);
         cursor.FixAllCameraDimensionsFloat();
 
         cursor.GotoNext(MoveType.After, instr => instr.MatchLdcR4(6f));
@@ -81,16 +81,16 @@ internal static class CameraZoomHooks {
 
     [ILHook(typeof(Audio), nameof(Audio.Position), BindingFlags.Public | BindingFlags.Static, tag: "mainZoomHooks")]
     private static void Audio_Position(ILContext il) {
-        ILCursor cursor = new(il);
+        ILCursor cursor = new ILCursor(il);
         cursor.FixAllCameraDimensionsFloat();
 
         cursor.GotoNext(MoveType.Before, instr => instr.MatchStfld<FMOD.VECTOR>("x"));
-        cursor.EmitDelegate(audioEdgeFadeFix);
+        cursor.EmitDelegate(AudioEdgeFadeFix);
         cursor.GotoNext(MoveType.Before, instr => instr.MatchStfld<FMOD.VECTOR>("y"));
-        cursor.EmitDelegate(audioEdgeFadeFix);
+        cursor.EmitDelegate(AudioEdgeFadeFix);
 
         // different for how excameradynamics does it but more reliable i find for extremely large camera scales
-        static float audioEdgeFadeFix(float orig) {
+        static float AudioEdgeFadeFix(float orig) {
             if (!Module.ZoomOutActive)
                 return orig;
 
@@ -101,7 +101,7 @@ internal static class CameraZoomHooks {
     // i shd probably handle more case by case stuff here but i   literally cannot be bothered atm catplush
     [ILHook(typeof(Lookout), nameof(Lookout.LookRoutine), BindingFlags.NonPublic | BindingFlags.Instance, HookTypes.IEnumerator, tag: "mainZoomHooks")]
     private static void Lookout_LookRoutine(ILContext il) {
-        ILCursor cursor = new(il);
+        ILCursor cursor = new ILCursor(il);
         cursor.FixAllCameraDimensionsFloatHalf();
         cursor.FixAllCameraDimensionsFloat();
         cursor.FixAllCameraDimensionsInt();
@@ -109,27 +109,27 @@ internal static class CameraZoomHooks {
 
     [ILHook(typeof(Lookout.Hud), nameof(Lookout.Hud.Update), BindingFlags.Public | BindingFlags.Instance, tag: "mainZoomHooks")]
     private static void Lookout_Hud_Update(ILContext il) {
-        ILCursor cursor = new(il);
+        ILCursor cursor = new ILCursor(il);
         cursor.FixAllCameraDimensionsInt();
     }
 
     [ILHook(typeof(DustEdges), nameof(DustEdges.BeforeRender), BindingFlags.Public | BindingFlags.Instance, tag: "mainZoomHooks")]
     private static void DustEdges_BeforeRender(ILContext il) {
-        ILCursor cursor = new(il);
+        ILCursor cursor = new ILCursor(il);
 
         cursor.FixAllCameraDimensionsFloat();
 
         if (cursor.TryGotoNext(MoveType.After, instr => instr.MatchLdcR4(1f / 320f))) {
             Logger.Verbose("ZoomOutHelperPrototype", $"patching pixel width value at {cursor.Index} in cil for {cursor.Method.Name}...");
-            cursor.EmitDelegate(fixPixelSize);
+            cursor.EmitDelegate(FixPixelSize);
         }
 
         if (cursor.TryGotoNext(MoveType.After, instr => instr.MatchLdcR4(1f / 180f))) {
             Logger.Verbose("ZoomOutHelperPrototype", $"patching pixel height value at {cursor.Index} in cil for {cursor.Method.Name}...");
-            cursor.EmitDelegate(fixPixelSize);
+            cursor.EmitDelegate(FixPixelSize);
         }
 
-        static float fixPixelSize(float orig) {
+        static float FixPixelSize(float orig) {
             if (Module.CanvasScale == 1)
                 return orig;
 
@@ -143,7 +143,7 @@ internal static class CameraZoomHooks {
 
     [ILHook(typeof(TalkComponent.TalkComponentUI), nameof(TalkComponent.TalkComponentUI.Render), BindingFlags.Public | BindingFlags.Instance, tag: "mainZoomHooks")]
     private static void TalkComponentUI_Render(ILContext il) {
-        ILCursor cursor = new(il);
+        ILCursor cursor = new ILCursor(il);
 
         // 320 used for mirror mode
         if (!cursor.TryGotoNext(MoveType.After, instr => instr.MatchLdcR4(Celeste.GameWidth)))
@@ -174,7 +174,7 @@ internal static class CameraZoomHooks {
     // bwehhh the thingg doesnt actually scale with the camera but imm too lazy rnn its such a big method and there isnt like just. one specific variable id have to change aaa
     [ILHook(typeof(BirdTutorialGui), nameof(BirdTutorialGui.Render), BindingFlags.Public | BindingFlags.Instance, tag: "mainZoomHooks")]
     private static void BirdTutorialGui_Render(ILContext il) {
-        ILCursor cursor = new(il);
+        ILCursor cursor = new ILCursor(il);
 
         // 320 used for mirror mode
         if (!cursor.TryGotoNext(MoveType.After, instr => instr.MatchLdcR4(Celeste.GameWidth)))
@@ -195,7 +195,7 @@ internal static class CameraZoomHooks {
 
     [ILHook(typeof(SpotlightWipe), nameof(SpotlightWipe.Render), BindingFlags.Public | BindingFlags.Instance, tag: "mainZoomHooks")]
     private static void SpotlightWipe_Render(ILContext il) {
-        ILCursor cursor = new(il);
+        ILCursor cursor = new ILCursor(il);
 
         while (cursor.TryGotoNext(MoveType.After, instr => instr.MatchLdcR4(6f))) {
             cursor.EmitFixHDUpscale();
@@ -208,31 +208,31 @@ internal static class CameraZoomHooks {
 
     [ILHook(typeof(Level), nameof(Level.IsInCamera), BindingFlags.Public | BindingFlags.Instance, tag: "mainZoomHooks")]
     private static void Level_IsInCamera(ILContext il) {
-        ILCursor cursor = new(il);
+        ILCursor cursor = new ILCursor(il);
         cursor.FixAllCameraDimensionsInt();
     }
 
     [ILHook(typeof(CrystalStaticSpinner), nameof(CrystalStaticSpinner.InView), BindingFlags.NonPublic | BindingFlags.Instance, tag: "mainZoomHooks")]
     private static void CrystalStaticSpinner_InView(ILContext il) {
-        ILCursor cursor = new(il);
+        ILCursor cursor = new ILCursor(il);
         cursor.FixAllCameraDimensionsFloat();
     }
 
     [ILHook(typeof(Lightning), nameof(Lightning.InView), BindingFlags.NonPublic | BindingFlags.Instance, tag: "mainZoomHooks")]
     private static void Lightning_InView(ILContext il) {
-        ILCursor cursor = new(il);
+        ILCursor cursor = new ILCursor(il);
         cursor.FixAllCameraDimensionsFloat();
     }
 
     [ILHook(typeof(LightningRenderer), nameof(LightningRenderer.OnRenderBloom), BindingFlags.NonPublic | BindingFlags.Instance, tag: "mainZoomHooks")]
     private static void LightningRenderer_OnRenderBloom(ILContext il) {
-        ILCursor cursor = new(il);
+        ILCursor cursor = new ILCursor(il);
         cursor.FixAllCameraDimensionsFloat();
     }
 
     [ILHook(typeof(FormationBackdrop), nameof(FormationBackdrop.Render), BindingFlags.Public | BindingFlags.Instance, tag: "mainZoomHooks")]
     private static void FormationBackdrop_Render(ILContext il) {
-        ILCursor cursor = new(il);
+        ILCursor cursor = new ILCursor(il);
         cursor.FixAllCameraDimensionsFloatPadded(2);
     }
 
@@ -242,25 +242,25 @@ internal static class CameraZoomHooks {
 
     [ILHook(typeof(Decal), nameof(Decal.Render), BindingFlags.Public | BindingFlags.Instance, tag: "mainZoomHooks")]
     private static void Decal_Render(ILContext il) {
-        ILCursor cursor = new(il);
+        ILCursor cursor = new ILCursor(il);
         cursor.FixAllCameraDimensionsFloatHalf();
     }
 
     [ILHook(typeof(BigWaterfall), nameof(BigWaterfall.RenderPosition), BindingFlags.NonPublic | BindingFlags.Instance, HookTypes.GetProperty, tag: "mainZoomHooks")]
     private static void BigWaterfall_RenderPosition(ILContext il) {
-        ILCursor cursor = new(il);
+        ILCursor cursor = new ILCursor(il);
         cursor.FixAllCameraDimensionsFloatHalf();
     }
 
     [ILHook(typeof(BigWaterfall), nameof(BigWaterfall.Render), BindingFlags.Public | BindingFlags.Instance, tag: "mainZoomHooks")]
     private static void BigWaterfall_Render(ILContext il) {
-        ILCursor cursor = new(il);
+        ILCursor cursor = new ILCursor(il);
         cursor.FixAllCameraDimensionsFloat();
     }
 
     [ILHook(typeof(SummitCloud), nameof(SummitCloud.RenderPosition), BindingFlags.NonPublic | BindingFlags.Instance, HookTypes.GetProperty, tag: "mainZoomHooks")]
     private static void SummitCloud_RenderPosition(ILContext il) {
-        ILCursor cursor = new(il);
+        ILCursor cursor = new ILCursor(il);
         cursor.FixAllCameraDimensionsFloatHalf();
     }
 

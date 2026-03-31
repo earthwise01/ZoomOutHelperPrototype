@@ -4,14 +4,14 @@ internal static class RendererHooks {
     // no safety checks yet bc im lazy so if it explodes it explodes, but it'd explode if it didn't work anyway so !
     [ILHook(typeof(Level), nameof(Level.Render), BindingFlags.Public | BindingFlags.Instance, tag: "mainZoomHooks")]
     private static void Level_Render(ILContext il) {
-        var cursor = new ILCursor(il);
+        ILCursor cursor = new ILCursor(il);
 
         // maybe not the best place for this..? these are also set before Level.Update in UpdateLevelZoom, but juust in case Level.Zoom is changed after that    umm i guess this is here
         // seems to at least work for the case of a badeline boost when zoom out is active not changing the zoom, and when zoom out is inactive working like normal
         cursor.EmitLdarg0();
-        cursor.EmitDelegate(makeSureCameraScaleIsCopiedToLevelZoom);
+        cursor.EmitDelegate(MakeSureCameraScaleIsCopiedToLevelZoom);
 
-        static void makeSureCameraScaleIsCopiedToLevelZoom(Level level) {
+        static void MakeSureCameraScaleIsCopiedToLevelZoom(Level level) {
             if (Module.CameraScale == 1f)
                 return;
 
@@ -66,9 +66,9 @@ internal static class RendererHooks {
 
         cursor.GotoNext(MoveType.After, instr => instr.MatchLdloc(scaleLocal));
         cursor.GotoPrev(MoveType.After, instr => instr.MatchLdloc(5));
-        cursor.EmitDelegate(fixMirrorModeHopefully);
+        cursor.EmitDelegate(FixMirrorModeHopefully);
 
-        static Vector2 fixMirrorModeHopefully(Vector2 orig) {
+        static Vector2 FixMirrorModeHopefully(Vector2 orig) {
             orig.X *= Module.CanvasScale;
             return orig;
         }
@@ -78,14 +78,14 @@ internal static class RendererHooks {
         // + drawBlackBars(vector4, scale);
         cursor.GotoNext(MoveType.After, instr => instr.MatchCallOrCallvirt<SpriteBatch>(nameof(SpriteBatch.End)));
         cursor.EmitLdloc(paddingLocal);
-        cursor.EmitDelegate(drawBlackBars);
+        cursor.EmitDelegate(DrawBlackBars);
 
 
-        static void drawBlackBars(Vector2 padding) {
+        static void DrawBlackBars(Vector2 padding) {
             if (!Module.ZoomOutActive || padding == Vector2.Zero)
                 return;
 
-            var scale = (320f - padding.X * 2f) / 320f;
+            float scale = (320f - padding.X * 2f) / 320f;
             // mirror mode
             // padding.X = MathF.Abs(padding.X);
             // padding.Y = MathF.Abs(padding.Y);
@@ -104,13 +104,13 @@ internal static class RendererHooks {
 
     [ILHook(typeof(BloomRenderer), nameof(BloomRenderer.Apply), BindingFlags.Public | BindingFlags.Instance, tag: "mainZoomHooks")]
     private static void BloomRenderer_Apply(ILContext il) {
-        var cursor = new ILCursor(il);
+        ILCursor cursor = new ILCursor(il);
         cursor.FixAllCameraDimensionsFloatPadded(20);
     }
 
     [ILHook(typeof(LightingRenderer), nameof(LightingRenderer.BeforeRender), BindingFlags.Public | BindingFlags.Instance, tag: "mainZoomHooks")]
     private static void LightingRenderer_BeforeRender(ILContext il) {
-        var cursor = new ILCursor(il);
+        ILCursor cursor = new ILCursor(il);
         cursor.FixAllCameraDimensionsFloat();
     }
 }

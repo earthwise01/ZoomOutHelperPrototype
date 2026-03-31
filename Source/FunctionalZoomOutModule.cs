@@ -55,7 +55,7 @@ public class FunctionalZoomOutModule : EverestModule {
     public override void LoadContent(bool firstLoad) {
         base.LoadContent(firstLoad);
 
-        FxDistortScalable ??= new(Engine.Graphics.GraphicsDevice, Everest.Content.Get("ZoomOutHelperPrototype:/Effects/FunctionalZoomOut/ZoomableDistort.fxb").Data) {
+        FxDistortScalable ??= new Effect(Engine.Graphics.GraphicsDevice, Everest.Content.Get("ZoomOutHelperPrototype:/Effects/FunctionalZoomOut/ZoomableDistort.fxb").Data) {
             Name = "Effects/FunctionalZoomOut/ZoomableDistort"
         };
 
@@ -113,7 +113,7 @@ public class FunctionalZoomOutModule : EverestModule {
     public static int GameplayBufferWidth => Celeste.GameWidth * CanvasScale;
     public static int GameplayBufferHeight => Celeste.GameHeight * CanvasScale;
 
-    public static Vector2 CenterFixOffset => new(MathF.Ceiling(Celeste.GameWidth / 2f * CameraScale) - Celeste.GameWidth / 2f, MathF.Ceiling(Celeste.GameHeight / 2f * CameraScale) - Celeste.GameHeight / 2f);
+    public static Vector2 CenterFixOffset => new Vector2(MathF.Ceiling(Celeste.GameWidth / 2f * CameraScale) - Celeste.GameWidth / 2f, MathF.Ceiling(Celeste.GameHeight / 2f * CameraScale) - Celeste.GameHeight / 2f);
 
     public static void ResetStaticFields() {
         TargetCameraScale = 1f;
@@ -186,8 +186,8 @@ public class FunctionalZoomOutModule : EverestModule {
     }
 
     private static bool SessionHasZoomOut(Session session, out float initialScale, out int version) {
-        var zoomOutEntities = session.MapData.Levels.SelectMany(levelData => levelData.Entities).Where(entityData => entityData.Name.StartsWith("ZoomOutHelperPrototype"));
-        var globalController = zoomOutEntities.FirstOrDefault(entityData => entityData.Name.EndsWith("GlobalZoomController"));
+        IEnumerable<EntityData> zoomOutEntities = session.MapData.Levels.SelectMany(levelData => levelData.Entities).Where(entityData => entityData.Name.StartsWith("ZoomOutHelperPrototype"));
+        EntityData globalController = zoomOutEntities.FirstOrDefault(entityData => entityData.Name.EndsWith("GlobalZoomController"));
         if (globalController is not null) {
             initialScale = globalController.Float("initialCameraScale", 1f);
             version = globalController.Int("_modVersion", 1);
@@ -259,7 +259,7 @@ public class FunctionalZoomOutModule : EverestModule {
 
     // why am i even doing it like this
     internal static void UpdateLevelZoomOut(Level level) {
-        var player = level.Tracker.GetEntity<Player>();
+        Player player = level.Tracker.GetEntity<Player>();
         if (player is null) {
             // Logger.Info("ZoomOutHelperPrototype", "can't update zoom level with a null player!");
             return;
@@ -270,9 +270,9 @@ public class FunctionalZoomOutModule : EverestModule {
         // float? levelScale = (float?)data.Get("ZoomOutHelperPrototype_CurrentZoom");
         if (1f / level.Zoom != TargetCameraScale && (CurrentCameraScale != 1f || TargetCameraScale != 1f)) {
             // grab stuff from the current state
-            var camera = level.Camera;
-            var diffFromTarget = camera.Position - player.CameraTarget;
-            var cameraCenter = camera.Position + new Vector2(camera.Viewport.Width / 2f, camera.Viewport.Height / 2f);
+            Camera camera = level.Camera;
+            Vector2 diffFromTarget = camera.Position - player.CameraTarget;
+            Vector2 cameraCenter = camera.Position + new Vector2(camera.Viewport.Width / 2f, camera.Viewport.Height / 2f);
 
             // update the scale variables
             CurrentCameraScale = TargetCameraScale;
@@ -377,11 +377,11 @@ public class FunctionalZoomOutModule : EverestModule {
     }
 
     private static void CopyEffectParams(Effect source, Effect target, params string[] ignoreParams) {
-        var ignoreHashset = ignoreParams.ToHashSet();
+        HashSet<string> ignoreHashset = ignoreParams.ToHashSet();
 
         Logger.Debug("ZoomOutHelperPrototype", $"copying effect params from source {source.Name} to target {target.Name}");
 
-        foreach (var parameter in source.Parameters) {
+        foreach (EffectParameter parameter in source.Parameters) {
             if (ignoreHashset.Contains(parameter.Name))
                 continue;
             Logger.Verbose("ZoomOutHelperPrototype", $"source: {parameter.Name}, {parameter.ParameterClass}, {parameter.ParameterType}");
@@ -435,7 +435,7 @@ public class FunctionalZoomOutModule : EverestModule {
 
         if (PixelPerfectZooming)
             scale = MathF.Round(scale * 160f) / 160f;
-        var prevScale = CameraScale;
+        float prevScale = CameraScale;
         CameraScale = scale;
 
         Engine.Commands.Log($"set the target camera scale to {scale:N2}x! previous was {prevScale:N2}x.");

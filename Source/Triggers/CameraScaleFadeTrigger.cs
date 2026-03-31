@@ -5,13 +5,13 @@ namespace Celeste.Mod.FunctionalZoomOut.Triggers;
 [CustomEntity("ZoomOutHelperPrototype/CameraScaleFadeTrigger")]
 [Tracked]
 public class CameraScaleFadeTrigger : Trigger {
-    private readonly float scaleFrom, scaleTo;
-    private readonly PositionModes positionMode;
+    private readonly float _scaleFrom, _scaleTo;
+    private readonly PositionModes _positionMode;
 
     public CameraScaleFadeTrigger(EntityData data, Vector2 offset) : base(data, offset) {
-        scaleFrom = data.Float("scaleFrom", 1f);
-        scaleTo = data.Float("scaleTo", 1f);
-        positionMode = data.Enum("positionMode", PositionModes.NoEffect);
+        _scaleFrom = data.Float("scaleFrom", 1f);
+        _scaleTo = data.Float("scaleTo", 1f);
+        _positionMode = data.Enum("positionMode", PositionModes.NoEffect);
     }
 
     public override void Added(Scene scene) {
@@ -28,7 +28,7 @@ public class CameraScaleFadeTrigger : Trigger {
     }
 
     public float GetScale(Player player)
-        => MathHelper.Lerp(scaleFrom, scaleTo, Ease.SineInOut(GetPositionLerp(player, positionMode)));
+        => MathHelper.Lerp(_scaleFrom, _scaleTo, Ease.SineInOut(GetPositionLerp(player, _positionMode)));
 
     // [HookLoadCallback("mainZoomHooks")]
     // internal static void LoadSpawnCameraScaleTrigger() {

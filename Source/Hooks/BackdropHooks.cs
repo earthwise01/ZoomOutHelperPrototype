@@ -13,7 +13,7 @@ internal static class BackdropHooks {
     [ILHook(typeof(Parallax), nameof(Parallax.Render), BindingFlags.Public | BindingFlags.Instance, tag: "mainZoomHooks")]
     [ILHook(typeof(Parallax), nameof(Parallax.orig_Render), BindingFlags.Public | BindingFlags.Instance, tag: "mainZoomHooks")]
     private static void Parallax_Render(ILContext il) {
-        var cursor = new ILCursor(il);
+        ILCursor cursor = new ILCursor(il);
 
         cursor.FixAllCameraDimensionsFloat();
         cursor.FixAllCameraDimensionsFloatHalf();
@@ -45,36 +45,36 @@ internal static class BackdropHooks {
 
     [ILHook(typeof(Godrays), nameof(Godrays.Update), BindingFlags.Public | BindingFlags.Instance, tag: "mainZoomHooks")]
     private static void Godrays_Update(ILContext il) {
-        var cursor = new ILCursor(il);
+        ILCursor cursor = new ILCursor(il);
 
         // resize vertex buffer
         // cursor.GotoNext(MoveType.AfterLabel, i => i.MatchRet());
         cursor.EmitLdarg0();
-        cursor.EmitDelegate(resizeVertexBuffer);
+        cursor.EmitDelegate(ResizeVertexBuffer);
 
         // fix parallax
         cursor.GotoNext(MoveType.After, i => i.MatchStloc(7));
 
-        static float addCenterFixX(float x) => x + Module.CenterFixOffset.X;
-        static float addCenterFixY(float y) => y + Module.CenterFixOffset.Y;
+        static float AddCenterFixX(float x) => x + Module.CenterFixOffset.X;
+        static float AddCenterFixY(float y) => y + Module.CenterFixOffset.Y;
 
         cursor.GotoNext(MoveType.After, i => i.MatchCallOrCallvirt<Camera>("get_X"));
-        cursor.EmitDelegate(addCenterFixX);
+        cursor.EmitDelegate(AddCenterFixX);
         cursor.GotoNext(MoveType.After, i => i.MatchSub());
-        cursor.EmitDelegate(addCenterFixX);
+        cursor.EmitDelegate(AddCenterFixX);
 
         cursor.GotoNext(MoveType.After, i => i.MatchCallOrCallvirt<Camera>("get_Y"));
-        cursor.EmitDelegate(addCenterFixY);
+        cursor.EmitDelegate(AddCenterFixY);
         cursor.GotoNext(MoveType.After, i => i.MatchSub());
-        cursor.EmitDelegate(addCenterFixY);
+        cursor.EmitDelegate(AddCenterFixY);
 
         // makeshift for loop to repeat the godrays
-        var loopXHeadLabel = cursor.DefineLabel();
-        var loopXStartLabel = cursor.DefineLabel();
-        var loopYHeadLabel = cursor.DefineLabel();
-        var loopYStartLabel = cursor.DefineLabel();
-        var loopX = new VariableDefinition(il.Import(typeof(int)));
-        var loopY = new VariableDefinition(il.Import(typeof(int)));
+        ILLabel loopXHeadLabel = cursor.DefineLabel();
+        ILLabel loopXStartLabel = cursor.DefineLabel();
+        ILLabel loopYHeadLabel = cursor.DefineLabel();
+        ILLabel loopYStartLabel = cursor.DefineLabel();
+        VariableDefinition loopX = new VariableDefinition(il.Import(typeof(int)));
+        VariableDefinition loopY = new VariableDefinition(il.Import(typeof(int)));
         il.Body.Variables.Add(loopX);
         il.Body.Variables.Add(loopY);
 
@@ -111,7 +111,7 @@ internal static class BackdropHooks {
         // x head
         cursor.MarkLabel(loopXHeadLabel);
         cursor.EmitLdloc(loopX);
-        cursor.EmitDelegate(loopXHead);
+        cursor.EmitDelegate(LoopXHead);
         cursor.EmitBrtrue(loopXStartLabel);
 
         // y end
@@ -122,10 +122,10 @@ internal static class BackdropHooks {
         // y head
         cursor.MarkLabel(loopYHeadLabel);
         cursor.EmitLdloc(loopY);
-        cursor.EmitDelegate(loopYHead);
+        cursor.EmitDelegate(LoopYHead);
         cursor.EmitBrtrue(loopYStartLabel);
 
-        static void resizeVertexBuffer(Godrays godrays) {
+        static void ResizeVertexBuffer(Godrays godrays) {
             int visibleScreens = (int)Math.Ceiling(Module.GetFixedCameraSize(Celeste.GameWidth) / 320f);
             visibleScreens *= visibleScreens;
             int expectedBufferLength = Godrays.RayCount * 6 * visibleScreens;
@@ -133,12 +133,12 @@ internal static class BackdropHooks {
                 godrays.vertices = new VertexPositionColor[expectedBufferLength];
         }
 
-        static bool loopXHead(int x) {
+        static bool LoopXHead(int x) {
             int visibleScreens = (int)Math.Ceiling(Module.GetFixedCameraSize(Celeste.GameWidth) / 320f);
             return x < 320 * visibleScreens + 32;
         }
 
-        static bool loopYHead(int y) {
+        static bool LoopYHead(int y) {
             int visibleScreens = (int)Math.Ceiling(Module.GetFixedCameraSize(Celeste.GameWidth) / 320f);
             return y < 180 * visibleScreens + 32;
         }
@@ -148,7 +148,7 @@ internal static class BackdropHooks {
 
     [ILHook(typeof(NorthernLights), nameof(NorthernLights.BeforeRender), BindingFlags.Public | BindingFlags.Instance, tag: "mainZoomHooks")]
     private static void NorthernLights_BeforeRender(ILContext il) {
-        var cursor = new ILCursor(il);
+        ILCursor cursor = new ILCursor(il);
 
         // rescale the northern lights to match the camera scale (without making them seem to become higher resolution)
 
@@ -156,9 +156,9 @@ internal static class BackdropHooks {
         cursor.FixNextCanvasHeightInt();
         cursor.GotoNext(MoveType.After, i => i.MatchStfld<NorthernLights>(nameof(NorthernLights.buffer))).MoveAfterLabels();
         cursor.EmitLdarg0();
-        cursor.EmitDelegate(resizeBufferIfNeeded);
+        cursor.EmitDelegate(ResizeBufferIfNeeded);
 
-        static void resizeBufferIfNeeded(NorthernLights self) {
+        static void ResizeBufferIfNeeded(NorthernLights self) {
             Module.EnsureBufferDimensions(self.buffer);
         }
 
@@ -166,9 +166,9 @@ internal static class BackdropHooks {
         cursor.Index = -1;
         cursor.GotoPrev(MoveType.Before, i => i.MatchCallOrCallvirt<SpriteBatch>(nameof(SpriteBatch.Begin)));
         cursor.EmitLdarg0();
-        cursor.EmitDelegate(upscaleBuffer);
+        cursor.EmitDelegate(UpscaleBuffer);
 
-        static void upscaleBuffer(NorthernLights self) {
+        static void UpscaleBuffer(NorthernLights self) {
             if (!Module.ZoomOutActive)
                 return;
 
@@ -181,16 +181,16 @@ internal static class BackdropHooks {
 
         // draw the northern lights to TempB rather than NorthernLights.buffer to prevent issues drawing a buffer to itself when upscaling
         cursor.GotoPrev(MoveType.After, i => i.MatchLdfld<NorthernLights>(nameof(NorthernLights.buffer))); // blur output
-        cursor.EmitDelegate(swapBufferToTempB);
+        cursor.EmitDelegate(SwapBufferToTempB);
         cursor.Index -= 2;
         cursor.GotoPrev(MoveType.After, i => i.MatchLdfld<NorthernLights>(nameof(NorthernLights.buffer))); // blur input
-        cursor.EmitDelegate(swapBufferToTempB);
+        cursor.EmitDelegate(SwapBufferToTempB);
         cursor.Index -= 2;
         cursor.GotoPrev(MoveType.After, i => i.MatchLdfld<NorthernLights>(nameof(NorthernLights.buffer))); // SetRenderTarget before drawing the vertices
-        cursor.EmitDelegate(swapBufferToTempB);
+        cursor.EmitDelegate(SwapBufferToTempB);
         cursor.Index -= 2;
 
-        static VirtualRenderTarget swapBufferToTempB(VirtualRenderTarget buffer) {
+        static VirtualRenderTarget SwapBufferToTempB(VirtualRenderTarget buffer) {
             if (Module.ZoomOutActive)
                 return GameplayBuffers.TempB;
 
@@ -207,15 +207,15 @@ internal static class BackdropHooks {
     private static void Snow_CoreStarsFG_StardustFG_Render(ILContext il) => Apply1x1ParticleLooping(il, false);
 
     private static void Apply1x1ParticleLooping(ILContext il, bool hasParallax) {
-        var cursor = new ILCursor(il);
+        ILCursor cursor = new ILCursor(il);
 
         // regret
-        var loopXHeadLabel = cursor.DefineLabel();
-        var loopXStartLabel = cursor.DefineLabel();
-        var loopYHeadLabel = cursor.DefineLabel();
-        var loopYStartLabel = cursor.DefineLabel();
-        var loopX = new VariableDefinition(il.Import(typeof(int)));
-        var loopY = new VariableDefinition(il.Import(typeof(int)));
+        ILLabel loopXHeadLabel = cursor.DefineLabel();
+        ILLabel loopXStartLabel = cursor.DefineLabel();
+        ILLabel loopYHeadLabel = cursor.DefineLabel();
+        ILLabel loopYStartLabel = cursor.DefineLabel();
+        VariableDefinition loopX = new VariableDefinition(il.Import(typeof(int)));
+        VariableDefinition loopY = new VariableDefinition(il.Import(typeof(int)));
         il.Body.Variables.Add(loopX);
         il.Body.Variables.Add(loopY);
 
@@ -233,14 +233,14 @@ internal static class BackdropHooks {
         cursor.MarkLabel(loopXStartLabel);
 
         // add loop variables and center fix offset (if needed)
-        static float addCenterFixX(float x) => x + Module.CenterFixOffset.X;
-        static float addCenterFixY(float y) => y + Module.CenterFixOffset.Y;
+        static float AddCenterFixX(float x) => x + Module.CenterFixOffset.X;
+        static float AddCenterFixY(float y) => y + Module.CenterFixOffset.Y;
 
         if (hasParallax) {
             cursor.GotoNext(MoveType.After, i => i.MatchCallOrCallvirt<Camera>("get_X"));
-            cursor.EmitDelegate(addCenterFixX);
+            cursor.EmitDelegate(AddCenterFixX);
             cursor.GotoNext(MoveType.After, i => i.MatchSub());
-            cursor.EmitDelegate(addCenterFixX);
+            cursor.EmitDelegate(AddCenterFixX);
         }
         cursor.GotoNext(MoveType.After, i => i.OpCode == OpCodes.Callvirt && (i.Operand as MethodReference).Name == "mod");
         cursor.EmitLdloc(loopX);
@@ -249,9 +249,9 @@ internal static class BackdropHooks {
 
         if (hasParallax) {
             cursor.GotoNext(MoveType.After, i => i.MatchCallOrCallvirt<Camera>("get_Y"));
-            cursor.EmitDelegate(addCenterFixY);
+            cursor.EmitDelegate(AddCenterFixY);
             cursor.GotoNext(MoveType.After, i => i.MatchSub());
-            cursor.EmitDelegate(addCenterFixY);
+            cursor.EmitDelegate(AddCenterFixY);
         }
         cursor.GotoNext(MoveType.After, i => i.OpCode == OpCodes.Callvirt && (i.Operand as MethodReference).Name == "mod");
         cursor.EmitLdloc(loopY);
@@ -270,7 +270,7 @@ internal static class BackdropHooks {
         // x head
         cursor.MarkLabel(loopXHeadLabel);
         cursor.EmitLdloc(loopX);
-        cursor.EmitDelegate(loopXHead);
+        cursor.EmitDelegate(LoopXHead);
         cursor.EmitBrtrue(loopXStartLabel);
 
         // y end
@@ -281,15 +281,15 @@ internal static class BackdropHooks {
         // y head
         cursor.MarkLabel(loopYHeadLabel);
         cursor.EmitLdloc(loopY);
-        cursor.EmitDelegate(loopYHead);
+        cursor.EmitDelegate(LoopYHead);
         cursor.EmitBrtrue(loopYStartLabel);
 
-        static bool loopXHead(int x) {
+        static bool LoopXHead(int x) {
             int visibleScreens = (int)Math.Ceiling(Module.GetFixedCameraSize(Celeste.GameWidth) / 320f);
             return x < 320 * visibleScreens;
         }
 
-        static bool loopYHead(int y) {
+        static bool LoopYHead(int y) {
             int visibleScreens = (int)Math.Ceiling(Module.GetFixedCameraSize(Celeste.GameWidth) / 320f);
             return y < 180 * visibleScreens;
         }

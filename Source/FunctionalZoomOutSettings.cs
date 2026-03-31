@@ -10,7 +10,7 @@ public class FunctionalZoomOutSettings : EverestModuleSettings {
     [YamlIgnore]
     public int CameraScaleMaximum { get; set; } = -1;
     public void CreateCameraScaleMaximumEntry(TextMenu menu, bool inGame) {
-        var option = new TextMenu.Option<int>(Dialog.Clean("modsettings_zoomouthelper_camerascalemaximum_name")).Add("Uncapped", -1, CameraScaleMaximum == -1);
+        TextMenu.Option<int> option = new TextMenu.Option<int>(Dialog.Clean("modsettings_zoomouthelper_camerascalemaximum_name")).Add("Uncapped", -1, CameraScaleMaximum == -1);
         for (int i = 10; i >= 1; i--)
             option.Add(i + "x", i, CameraScaleMaximum == i);
 

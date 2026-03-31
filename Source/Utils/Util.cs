@@ -21,7 +21,7 @@ public static class Util {
     public static float CameraScale => FunctionalZoomOutModule.CameraScale;
     public static float CameraWidth => FunctionalZoomOutModule.GetFixedCameraSize(Celeste.GameWidth);
     public static float CameraHeight => FunctionalZoomOutModule.GetFixedCameraSize(Celeste.GameHeight);
-    public static Vector2 CameraDimensions => new(CameraWidth, CameraHeight);
+    public static Vector2 CameraDimensions => new Vector2(CameraWidth, CameraHeight);
 
     public static void SetCameraScale(float value) => FunctionalZoomOutModule.CameraScale = value;
 }

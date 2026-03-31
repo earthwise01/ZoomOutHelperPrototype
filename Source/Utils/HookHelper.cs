@@ -14,47 +14,47 @@ namespace Celeste.Mod.FunctionalZoomOut.Utils;
 
 // this whole thing is still kinda just a janky messy and im probably just going to use The Normal Way but for now this is nice for prototyping i think
 internal static class HookHelper {
-    private static bool Initialized;
+    private static bool initialized;
 
     internal static void Initialize(Assembly assembly) {
-        if (Initialized)
+        if (initialized)
             return;
 
         Logger.Info("ZoomOutHelperPrototype", "[HookHelper] initializing OnHook, ILHook, HookLoadCallback, and HookUnloadCallback attributes...");
 
         // get all types in the specified assembly
-        foreach (var type in assembly.GetTypesSafe()) {
+        foreach (Type type in assembly.GetTypesSafe()) {
 
             // get all static methods in each type
-            foreach (var methodInfo in type.GetMethods(BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public)) {
+            foreach (MethodInfo methodInfo in type.GetMethods(BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public)) {
 
                 // initialize all onhook attributes on each static method
-                foreach (var attribute in methodInfo.GetCustomAttributes<OnHookAttribute>()) {
-                    if (!TryGetHookAttributeTarget(attribute, out var targetMethod))
+                foreach (OnHookAttribute attribute in methodInfo.GetCustomAttributes<OnHookAttribute>()) {
+                    if (!TryGetHookAttributeTarget(attribute, out MethodBase targetMethod))
                         continue;
 
-                    Get(attribute.Tag).AddAttribute(new(IsILHook: false, targetMethod, methodInfo));
+                    Get(attribute.Tag).AddAttribute(new HookAttributeInfo(IsILHook: false, targetMethod, methodInfo));
                 }
 
                 // initialize all ilhook attributes on each static method
-                foreach (var attribute in methodInfo.GetCustomAttributes<ILHookAttribute>()) {
+                foreach (ILHookAttribute attribute in methodInfo.GetCustomAttributes<ILHookAttribute>()) {
 
                     // bail if method doesn't have the correct parameters
                     if (methodInfo.ReturnType != typeof(void) || methodInfo.GetParameters().Length != 1 || methodInfo.GetParameters()[0].ParameterType != typeof(ILContext)) {
-                        Logger.Warn("ZoomOutHelperPrototype", $"[HookHelper] invalid method signature for IL hook {methodInfo.DeclaringType.Name}.{methodInfo.Name}!");
+                        Logger.Warn("ZoomOutHelperPrototype", $"[HookHelper] invalid method signature for IL hook {methodInfo.DeclaringType!.Name}.{methodInfo.Name}!");
                         break;
                     }
 
-                    if (!TryGetHookAttributeTarget(attribute, out var targetMethod))
+                    if (!TryGetHookAttributeTarget(attribute, out MethodBase targetMethod))
                         continue;
 
-                    Get(attribute.Tag).AddAttribute(new(IsILHook: true, targetMethod, methodInfo));
+                    Get(attribute.Tag).AddAttribute(new HookAttributeInfo(IsILHook: true, targetMethod, methodInfo));
                 }
 
                 // initialize all hookloadcallback attributes on each static method
-                foreach (var attribute in methodInfo.GetCustomAttributes<HookLoadCallbackAttribute>()) {
+                foreach (HookLoadCallbackAttribute attribute in methodInfo.GetCustomAttributes<HookLoadCallbackAttribute>()) {
                     if (methodInfo.ReturnType != typeof(void) || methodInfo.GetParameters().Length != 0) {
-                        Logger.Warn("ZoomOutHelperPrototype", $"[HookHelper] invalid method signature for hook load callback {methodInfo.DeclaringType.Name}.{methodInfo.Name}!");
+                        Logger.Warn("ZoomOutHelperPrototype", $"[HookHelper] invalid method signature for hook load callback {methodInfo.DeclaringType!.Name}.{methodInfo.Name}!");
                         break;
                     }
 
@@ -62,9 +62,9 @@ internal static class HookHelper {
                 }
 
                 // initialize all hookunloadcallback attributes on each static method
-                foreach (var attribute in methodInfo.GetCustomAttributes<HookUnloadCallbackAttribute>()) {
+                foreach (HookUnloadCallbackAttribute attribute in methodInfo.GetCustomAttributes<HookUnloadCallbackAttribute>()) {
                     if (methodInfo.ReturnType != typeof(void) || methodInfo.GetParameters().Length != 0) {
-                        Logger.Warn("ZoomOutHelperPrototype", $"[HookHelper] invalid method signature for hook unload callback {methodInfo.DeclaringType.Name}.{methodInfo.Name}!");
+                        Logger.Warn("ZoomOutHelperPrototype", $"[HookHelper] invalid method signature for hook unload callback {methodInfo.DeclaringType!.Name}.{methodInfo.Name}!");
                         break;
                     }
 
@@ -73,14 +73,14 @@ internal static class HookHelper {
             }
         }
 
-        Initialized = true;
+        initialized = true;
     }
 
     private static HookTag Get(string tag) {
-        if (hookTags.TryGetValue(tag, out var hookTag))
+        if (HookTags.TryGetValue(tag, out HookTag hookTag))
             return hookTag;
 
-        return hookTags[tag] = new();
+        return HookTags[tag] = new HookTag();
     }
 
     private static bool TryGetHookAttributeTarget(HookBaseAttribute attribute, out MethodBase target) {
@@ -127,23 +127,23 @@ internal static class HookHelper {
     }
 
     internal static void Uninitialize() {
-        if (!Initialized)
+        if (!initialized)
             return;
 
-        foreach (var tag in hookTags.Keys)
+        foreach (string tag in HookTags.Keys)
             UnloadTag(tag);
 
-        foreach (var tag in hookTags.Values)
+        foreach (HookTag tag in HookTags.Values)
             tag.Clear();
-        hookTags.Clear();
+        HookTags.Clear();
 
-        Initialized = false;
+        initialized = false;
     }
 
-    private static readonly Dictionary<string, HookTag> hookTags = [];
+    private static readonly Dictionary<string, HookTag> HookTags = [];
 
     internal static void LoadTag(string tag = "defaultTag") {
-        if (!Initialized || !hookTags.TryGetValue(tag, out HookTag hookTag) || hookTag.Loaded) {
+        if (!initialized || !HookTags.TryGetValue(tag, out HookTag hookTag) || hookTag.Loaded) {
             Logger.Warn("ZoomOutHelperPrototype", $"could not load tag \"{tag}\"! (hookhelper has not been initialized, the hooktag does not exist, or the hooktag is already loaded.)");
             return;
         }
@@ -153,7 +153,7 @@ internal static class HookHelper {
     }
 
     internal static void UnloadTag(string tag = "defaultTag") {
-        if (!Initialized || !hookTags.TryGetValue(tag, out HookTag hookTag) || !hookTag.Loaded)
+        if (!initialized || !HookTags.TryGetValue(tag, out HookTag hookTag) || !hookTag.Loaded)
             return;
 
         hookTag.Unload();
@@ -163,12 +163,12 @@ internal static class HookHelper {
     private record HookAttributeInfo(bool IsILHook, MethodBase TargetMethod, MethodInfo HookMethod);
 
     private class HookTag {
-        private readonly HashSet<Action> loadCallbacks = [];
-        private readonly HashSet<Action> unloadCallbacks = [];
+        private readonly HashSet<Action> _loadCallbacks = [];
+        private readonly HashSet<Action> _unloadCallbacks = [];
 
-        private readonly HashSet<Hook> attributeOnHooks = [];
-        private readonly HashSet<ILHook> attributeILHooks = [];
-        private readonly HashSet<HookAttributeInfo> hookAttributes = [];
+        private readonly HashSet<Hook> _attributeOnHooks = [];
+        private readonly HashSet<ILHook> _attributeILHooks = [];
+        private readonly HashSet<HookAttributeInfo> _hookAttributes = [];
 
         public bool Loaded { get; private set; }
 
@@ -176,19 +176,19 @@ internal static class HookHelper {
             Unload();
 
             try {
-                foreach (var loadCallback in loadCallbacks) {
+                foreach (Action loadCallback in _loadCallbacks) {
                     loadCallback.Invoke();
 
                     Logger.Info("ZoomOutHelperPrototype", $"[HookHelper] ran hook loading callback {loadCallback.Method.Name}!");
                 }
 
-                foreach (var hookAttribute in hookAttributes) {
+                foreach (HookAttributeInfo hookAttribute in _hookAttributes) {
                     if (hookAttribute.IsILHook)
-                        attributeILHooks.Add(new(hookAttribute.TargetMethod, hookAttribute.HookMethod.CreateDelegate<ILContext.Manipulator>()));
+                        _attributeILHooks.Add(new ILHook(hookAttribute.TargetMethod, hookAttribute.HookMethod.CreateDelegate<ILContext.Manipulator>()));
                     else
-                        attributeOnHooks.Add(new(hookAttribute.TargetMethod, hookAttribute.HookMethod));
+                        _attributeOnHooks.Add(new Hook(hookAttribute.TargetMethod, hookAttribute.HookMethod));
 
-                    Logger.Info("ZoomOutHelperPrototype", $"[HookHelper] loaded hook {hookAttribute.HookMethod.DeclaringType.Name}.{hookAttribute.HookMethod.Name} for {hookAttribute.TargetMethod.DeclaringType.Name}.{hookAttribute.TargetMethod.Name}!");
+                    Logger.Info("ZoomOutHelperPrototype", $"[HookHelper] loaded hook {hookAttribute.HookMethod.DeclaringType!.Name}.{hookAttribute.HookMethod.Name} for {hookAttribute.TargetMethod.DeclaringType!.Name}.{hookAttribute.TargetMethod.Name}!");
                 }
 
                 Loaded = true;
@@ -199,15 +199,15 @@ internal static class HookHelper {
         }
 
         public void Unload() {
-            foreach (var ilHook in attributeILHooks)
+            foreach (ILHook ilHook in _attributeILHooks)
                 ilHook?.Dispose();
-            attributeILHooks.Clear();
+            _attributeILHooks.Clear();
 
-            foreach (var onHook in attributeOnHooks)
+            foreach (Hook onHook in _attributeOnHooks)
                 onHook?.Dispose();
-            attributeOnHooks.Clear();
+            _attributeOnHooks.Clear();
 
-            foreach (var unloadCallback in unloadCallbacks) {
+            foreach (Action unloadCallback in _unloadCallbacks) {
                 unloadCallback.Invoke();
 
                 Logger.Info("ZoomOutHelperPrototype", $"[HookHelper] ran hook unloading callback {unloadCallback.Method.Name}!");
@@ -217,20 +217,20 @@ internal static class HookHelper {
         }
 
         public void AddAttribute(HookAttributeInfo attributeInfo) =>
-            hookAttributes.Add(attributeInfo);
+            _hookAttributes.Add(attributeInfo);
 
         public void AddLoadCallback(Action callback) =>
-            loadCallbacks.Add(callback);
+            _loadCallbacks.Add(callback);
 
         public void AddUnloadCallback(Action callback) =>
-            unloadCallbacks.Add(callback);
+            _unloadCallbacks.Add(callback);
 
         public void Clear() {
             Unload();
 
-            loadCallbacks.Clear();
-            unloadCallbacks.Clear();
-            hookAttributes.Clear();
+            _loadCallbacks.Clear();
+            _unloadCallbacks.Clear();
+            _hookAttributes.Clear();
         }
     }
 }

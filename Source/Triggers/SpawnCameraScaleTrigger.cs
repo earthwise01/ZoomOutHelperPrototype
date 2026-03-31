@@ -5,10 +5,10 @@ namespace Celeste.Mod.FunctionalZoomOut.Triggers;
 [CustomEntity("ZoomOutHelperPrototype/SpawnCameraScaleTrigger")]
 [Tracked]
 public class SpawnCameraScaleTrigger : Trigger {
-    private readonly float scale;
+    private readonly float _scale;
 
     public SpawnCameraScaleTrigger(EntityData data, Vector2 offset) : base(data, offset) {
-        scale = data.Float("scale", 1f);
+        _scale = data.Float("scale", 1f);
     }
 
     [HookLoadCallback("mainZoomHooks")]
@@ -22,8 +22,8 @@ public class SpawnCameraScaleTrigger : Trigger {
     }
 
     private static void Event_Player_Spawn(Player player) {
-        var trigger = player.CollideFirst<SpawnCameraScaleTrigger>();
+        SpawnCameraScaleTrigger trigger = player.CollideFirst<SpawnCameraScaleTrigger>();
         if (trigger is not null)
-            Module.CameraScale = trigger.scale;
+            Module.CameraScale = trigger._scale;
     }
 }
