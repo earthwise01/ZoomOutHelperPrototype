@@ -24,8 +24,11 @@ public class CameraScaleFadeTrigger : Trigger {
     public override void OnStay(Player player) {
         base.OnStay(player);
 
-        Module.CameraScale = MathHelper.Lerp(scaleFrom, scaleTo, Ease.SineInOut(GetPositionLerp(player, positionMode)));
+        Module.CameraScale = GetScale(player);
     }
+
+    public float GetScale(Player player)
+        => MathHelper.Lerp(scaleFrom, scaleTo, Ease.SineInOut(GetPositionLerp(player, positionMode)));
 
     // [HookLoadCallback("mainZoomHooks")]
     // internal static void LoadSpawnCameraScaleTrigger() {

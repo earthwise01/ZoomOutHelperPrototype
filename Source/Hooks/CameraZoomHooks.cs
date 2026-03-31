@@ -280,7 +280,7 @@ internal static class CameraZoomHooks {
     //
     [ILHook(typeof(Level), "orig_TransitionRoutine", BindingFlags.NonPublic | BindingFlags.Instance, HookTypes.IEnumerator, tag: "mainZoomHooks")]
     private static void Level_orig_TransitionRoutine(ILContext il) {
-        var cursor = new ILCursor(il);
+        ILCursor cursor = new ILCursor(il);
 
         // before: Vector2 cameraTo = GetFullCameraTargetAt(player, playerTo);
         cursor.GotoNext(MoveType.After, i => i.MatchCallOrCallvirt<Level>(nameof(Level.GetFullCameraTargetAt)));
@@ -296,24 +296,34 @@ internal static class CameraZoomHooks {
         cursor.EmitLdfld(playerField);
         cursor.EmitLdarg0();
         cursor.EmitLdfld(playerToField);
-        cursor.EmitDelegate(prepareCameraScales);
+        cursor.EmitDelegate(PrepareCameraScales);
 
-        static void prepareCameraScales(object ienumeratorObject, Player player, Vector2 playerTo) {
-            var selfData = DynamicData.For(ienumeratorObject);
-            var cameraScaleFrom = Module.CameraScale;
-            var cameraScaleTo = getCameraScaleForRoom((player.Scene as Level).Session) ?? cameraScaleFrom;
+        static void PrepareCameraScales(object ienumeratorObject, Player player, Vector2 playerTo) {
+            DynamicData selfData = DynamicData.For(ienumeratorObject);
+            float cameraScaleFrom = Module.CameraScale;
+            float cameraScaleTo = GetCameraScaleFromTrigger(player, playerTo) ?? GetCameraScaleForRoom((player.Scene as Level).Session) ?? cameraScaleFrom;
             selfData.Set("FZO_cameraScaleFrom", cameraScaleFrom);
             selfData.Set("FZO_cameraScaleTo", cameraScaleTo);
 
             // temporarily override the current camera scale so that cameraTo ends up accounting for the new camera scale
             Module.CurrentCameraScale = cameraScaleTo;
 
-            static float? getCameraScaleForRoom(Session session) {
-                var id = session.MapData.Area.ID;
-                var mode = session.MapData.Area.Mode;
-                var levelName = session.Level;
 
-                if (FunctionalZoomOutMapDataProcessor.RoomZoomControllerValues.TryGetValue((id, mode), out var mapRoomZooms) && mapRoomZooms.TryGetValue(levelName, out var roomZoom))
+            static float? GetCameraScaleFromTrigger(Player player, Vector2 position)
+            {
+                Vector2 playerPosition = player.Position;
+                player.Position = position;
+                float? cameraScale = player.CollideFirst<CameraScaleFadeTrigger>()?.GetScale(player);
+                player.Position = playerPosition;
+                return cameraScale;
+            }
+
+            static float? GetCameraScaleForRoom(Session session) {
+                int id = session.MapData.Area.ID;
+                AreaMode mode = session.MapData.Area.Mode;
+                string levelName = session.Level;
+
+                if (FunctionalZoomOutMapDataProcessor.RoomZoomControllerValues.TryGetValue((id, mode), out Dictionary<string, float> mapRoomZooms) && mapRoomZooms.TryGetValue(levelName, out float roomZoom))
                     return roomZoom;
 
                 return null;
@@ -323,27 +333,27 @@ internal static class CameraZoomHooks {
         FieldReference cameraToField = null;
         cursor.GotoNext(MoveType.After, i => i.MatchStfld(out cameraToField));
         cursor.EmitLdarg0();
-        cursor.EmitDelegate(resetCameraScaleOverride);
+        cursor.EmitDelegate(ResetCameraScaleOverride);
 
         // reset the camera scale back to what it should be
-        static void resetCameraScaleOverride(object ienumeratorObject) {
-            var selfData = DynamicData.For(ienumeratorObject);
-            var cameraScaleFrom = selfData.Get<float>("FZO_cameraScaleFrom");
+        static void ResetCameraScaleOverride(object ienumeratorObject) {
+            DynamicData selfData = DynamicData.For(ienumeratorObject);
+            float cameraScaleFrom = selfData.Get<float>("FZO_cameraScaleFrom");
             Module.CurrentCameraScale = cameraScaleFrom;
         }
 
         cursor.GotoNextBestFit(MoveType.After, i => i.MatchLdfld(cameraToField), i => i.MatchCallOrCallvirt<Camera>("set_Position"));
-        var setCameraPositionIndex = cursor.Index;
+        int setCameraPositionIndex = cursor.Index;
         FieldReference cameraAtField = null;
         cursor.GotoPrev(MoveType.Before, i => i.MatchCallOrCallvirt(typeof(Calc), nameof(Calc.Approach)), i => i.MatchStfld(out cameraAtField));
         cursor.Index = setCameraPositionIndex;
         cursor.EmitLdarg0();
         cursor.EmitLdloc1();
-        cursor.EmitDelegate(setFinalCameraScale);
+        cursor.EmitDelegate(SetFinalCameraScale);
 
-        static void setFinalCameraScale(object ienumeratorObject, Level level) {
-            var selfData = DynamicData.For(ienumeratorObject);
-            var cameraScaleTo = selfData.Get<float>("FZO_cameraScaleTo");
+        static void SetFinalCameraScale(object ienumeratorObject, Level level) {
+            DynamicData selfData = DynamicData.For(ienumeratorObject);
+            float cameraScaleTo = selfData.Get<float>("FZO_cameraScaleTo");
             Module.CameraScale = cameraScaleTo;
             Module.UpdateLevelZoomOut(level);
         }
@@ -353,12 +363,12 @@ internal static class CameraZoomHooks {
         cursor.EmitLdarg0();
         cursor.EmitLdfld(cameraAtField);
         cursor.EmitLdloc1();
-        cursor.EmitDelegate(setTransitionCameraScale);
+        cursor.EmitDelegate(SetTransitionCameraScale);
 
-        static void setTransitionCameraScale(object ienumeratorObject, float cameraAt, Level level) {
-            var selfData = DynamicData.For(ienumeratorObject);
-            var cameraScaleFrom = selfData.Get<float>("FZO_cameraScaleFrom");
-            var cameraScaleTo = selfData.Get<float>("FZO_cameraScaleTo");
+        static void SetTransitionCameraScale(object ienumeratorObject, float cameraAt, Level level) {
+            DynamicData selfData = DynamicData.For(ienumeratorObject);
+            float cameraScaleFrom = selfData.Get<float>("FZO_cameraScaleFrom");
+            float cameraScaleTo = selfData.Get<float>("FZO_cameraScaleTo");
             Module.CameraScale = MathHelper.Lerp(cameraScaleFrom, cameraScaleTo, Ease.CubeOut(cameraAt));
             Module.UpdateLevelZoomOut(level);
         }
